@@ -1,0 +1,12 @@
+services:
+  flowpilot:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data          # 数据库、微信导入目录、报告目录持久化
+    environment:
+      FLOWPILOT_AI_PROVIDER: mock   # anthropic / openai / mock
+      # FLOWPILOT_AI_ANTHROPIC_APIKEY: sk-ant-xxx
+      # FLOWPILOT_AUTH_JWTSECRET: 换成强随机密钥
+    restart: unless-stopped

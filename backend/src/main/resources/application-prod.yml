@@ -1,0 +1,24 @@
+# 生产环境配置：java -jar flowpilot.jar --spring.profiles.active=prod
+# 所有敏感配置通过环境变量注入，切勿提交真实密钥到代码仓库。
+spring:
+  datasource:
+    url: ${FLOWPILOT_DB_URL:jdbc:postgresql://localhost:5432/flowpilot}
+    driver-class-name: org.postgresql.Driver
+    username: ${FLOWPILOT_DB_USER:flowpilot}
+    password: ${FLOWPILOT_DB_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+  h2:
+    console:
+      enabled: false
+
+server:
+  port: ${FLOWPILOT_SERVER_PORT:8080}
+
+flowpilot:
+  seed-demo: false
+  auth:
+    # 生产环境必须通过 FLOWPILOT_AUTH_JWTSECRET 注入强随机密钥（≥32 字节）
+    jwt-secret: ${FLOWPILOT_AUTH_JWTSECRET:}

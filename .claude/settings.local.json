@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(textutil -convert txt \"FlowPilot流程领航员-飞书AI流程跟踪助手插件产品需求文档V1.0.docx\" -output /tmp/flowpilot_prd.txt)",
+      "Read(//tmp/**)"
+    ]
+  }
+}

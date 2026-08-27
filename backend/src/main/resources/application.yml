@@ -1,0 +1,102 @@
+spring:
+  application:
+    name: flowpilot
+  # 开发环境默认 H2 文件库（零安装）。生产环境用 application-prod.yml 切换 PostgreSQL。
+  datasource:
+    url: jdbc:h2:file:./data/flowpilot;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  servlet:
+    multipart:
+      max-file-size: 30MB
+      max-request-size: 30MB
+  mvc:
+    # 前端打包资源在 /static 下，SPA 路由交给前端处理
+    throw-exception-if-no-handler-found: false
+
+server:
+  port: 8080
+  error:
+    include-message: always
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  level:
+    com.flowpilot: INFO
+
+flowpilot:
+  seed-demo: true
+  auth:
+    jwt-secret: ${FLOWPILOT_AUTH_JWTSECRET:flowpilot-dev-secret-change-me-in-production}
+    token-expire-hours: 24
+  ai:
+    # mock(演示，无需密钥) / anthropic(Claude 官方 SDK) / openai(OpenAI 兼容协议)
+    provider: ${FLOWPILOT_AI_PROVIDER:mock}
+    parallelism: 8
+    timeout-seconds: 120
+    max-messages-per-analysis: 200
+    anthropic:
+      api-key: ${FLOWPILOT_AI_ANTHROPIC_APIKEY:}
+      model: ${FLOWPILOT_AI_ANTHROPIC_MODEL:claude-opus-5}
+      base-url: ${FLOWPILOT_AI_ANTHROPIC_BASEURL:}
+      # 第三方 Anthropic 兼容网关（中转站）请设 false（宽松 JSON 模式）
+      strict-schema: ${FLOWPILOT_AI_ANTHROPIC_STRICTSCHEMA:true}
+    openai:
+      api-key: ${FLOWPILOT_AI_OPENAI_APIKEY:}
+      base-url: ${FLOWPILOT_AI_OPENAI_BASEURL:https://api.openai.com/v1}
+      model: ${FLOWPILOT_AI_OPENAI_MODEL:gpt-4o-mini}
+  feishu:
+    app-id: ${FLOWPILOT_FEISHU_APPID:}
+    app-secret: ${FLOWPILOT_FEISHU_APPSECRET:}
+    encrypt-key: ${FLOWPILOT_FEISHU_ENCRYPTKEY:}
+    verification-token: ${FLOWPILOT_FEISHU_VERIFICATIONTOKEN:}
+  wecom:
+    corp-id: ${FLOWPILOT_WECOM_CORPID:}
+    corp-secret: ${FLOWPILOT_WECOM_CORPSECRET:}
+    agent-id: ${FLOWPILOT_WECOM_AGENTID:}
+    encoding-aes-key: ${FLOWPILOT_WECOM_ENCODINGAESKEY:}
+    token: ${FLOWPILOT_WECOM_TOKEN:}
+  wechat:
+    watch-dir: ${FLOWPILOT_WECHAT_WATCHDIR:./data/watch}
+    watch-enabled: ${FLOWPILOT_WECHAT_WATCHENABLED:true}
+    ocr:
+      provider: ${FLOWPILOT_WECHAT_OCR_PROVIDER:disabled}
+      baidu-api-key: ${FLOWPILOT_WECHAT_OCR_BAIDUAPIKEY:}
+      baidu-secret-key: ${FLOWPILOT_WECHAT_OCR_BAIDUSECRETKEY:}
+  email:
+    enabled: ${FLOWPILOT_EMAIL_ENABLED:false}
+    imap-host: ${FLOWPILOT_EMAIL_IMAPHOST:}
+    imap-port: ${FLOWPILOT_EMAIL_IMAPPORT:993}
+    username: ${FLOWPILOT_EMAIL_USERNAME:}
+    password: ${FLOWPILOT_EMAIL_PASSWORD:}
+    folder: ${FLOWPILOT_EMAIL_FOLDER:INBOX}
+    poll-minutes: ${FLOWPILOT_EMAIL_POLLMINUTES:15}
+    max-per-poll: 50
+    lookback-days: 14
+  notify:
+    digest-cron: "0 0 9 * * ?"
+    sync-cron: "0 */30 * * * ?"
+    sla-check-cron: "0 5 * * * ?"
+    weekly-report-cron: "0 0 8 ? * MON"
+    monthly-report-cron: "0 0 8 1 * ?"
+    feishu-webhook: ${FLOWPILOT_NOTIFY_FEISHUWEBHOOK:}
+    wecom-webhook: ${FLOWPILOT_NOTIFY_WECOMWEBHOOK:}
+  data:
+    retention-days: 90

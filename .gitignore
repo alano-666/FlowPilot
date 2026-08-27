@@ -1,0 +1,27 @@
+# 构建产物
+backend/target/
+frontend/node_modules/
+frontend/dist/
+backend/src/main/resources/static/assets/
+backend/src/main/resources/static/index.html
+
+# 本地数据（数据库/导入目录/报告）
+data/
+backend/data/
+
+# 本地工具
+.tools/
+
+# 本地密钥（绝不入库）
+.env.local
+backend/.env.local
+*.env.local
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# 日志
+*.log
