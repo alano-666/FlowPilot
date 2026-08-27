@@ -111,17 +111,73 @@ export FLOWPILOT_FEISHU_APPSECRET=xxxxxxxx
 
 ### 第 7 步：接入真实飞书（评审演示必做，约 15 分钟）
 
-让系统真正读你飞书群里的消息、往群里发提醒：
+让系统真正读你飞书群里的消息、往群里发提醒。**按下面顺序操作，缺一步都不生效**：
 
-1. 打开 https://open.feishu.cn/app → 创建企业自建应用（需要企业管理员同意）
-2. 应用里开通 3 个权限：`im:message`、`im:chat`、`contact:user.base:readonly`
-3. 事件订阅勾选 `im.message.receive_v1`，回调地址填 `https://你的公网地址/api/v1/webhooks/feishu/events`
-   - **没有域名？** 终端运行 `./scripts/tunnel.sh`，脚本会自动把本机变成公网并**直接打印要填的完整地址**，复制粘贴即可
-4. 把 AppID/Secret 填进第 3 步的 `.env.local`，重启
-5. 数据源管理页点「🔍 检测飞书凭证」→ 显示 ✅ 后，把机器人拉进项目群，绑定群 ID
-6. 在群里发一条消息，3 秒内它就会出现在项目详情页
+**7.1 先补上「机器人」能力（90% 的人漏掉，导致后面找不到权限）**
+1. 打开 https://open.feishu.cn/app → 创建企业自建应用
+2. 左侧菜单 → 「**添加应用能力**」→ 找到【**机器人**】点添加
+3. ⚠️ 不加机器人能力，所有消息相关权限根本不会显示出来
 
-> 完整的图文步骤和评审 5 分钟演示话术，见 `docs/07-飞书企微接入指南.md` 和 `docs/10-评审演示脚本.md`。
+**7.2 开通权限（新版权限名，别搜旧名字）**
+- 左侧菜单 → 「**开发配置**」→「**权限管理**」→【API 权限】标签页
+- 页面上方切换到「**应用身份权限（tenant_access_token）**」
+- 逐个搜索并开通（勾选后点开通，自建应用自动审批通过）：
+
+| 作用 | 权限名（新版） | 旧教程里找不到很正常 |
+|---|---|---|
+| 机器人发提醒消息 | `im:message:send_as_bot` | 旧名 `im:message` |
+| 读取群里消息（**推荐**，看板能跟踪全群对话） | `im:message.group_msg:readonly` | 旧名 `im:message` |
+| 读取群里 @机器人 的消息（最低要求） | `im:message.group_at_msg:readonly` | 旧名 `im:message` |
+| 读取单聊消息 | `im:message.p2p_msg:readonly` | 旧名 `im:message` |
+| 读取群信息 | `im:chat:read` | 旧名 `im:chat` |
+| 读取用户昵称头像 | `contact:user.base:readonly` | 名字没变 |
+
+> 💡 **懒人方式**：权限管理页右上角「批量导入」→ 粘贴下面 JSON 一键开通：
+> ```json
+> {
+>   "scopes": {
+>     "tenant": [
+>       "contact:user.base:readonly",
+>       "im:chat:read",
+>       "im:message.group_msg:readonly",
+>       "im:message.group_at_msg:readonly",
+>       "im:message.p2p_msg:readonly",
+>       "im:message:send_as_bot"
+>     ],
+>     "user": []
+>   }
+> }
+> ```
+> 💡 **注意**：只开 `group_at_msg` 时，系统只能收到「@机器人」的消息；开了 `group_msg:readonly` 后群里任何消息都能被 AI 跟踪，体验最好。
+
+**7.3 配置事件订阅（让飞书把群消息推给系统）**
+1. 左侧「**事件与回调**」→ 订阅方式选【**将事件发送至开发者服务器**】
+2. 回调地址填：`https://你的公网地址/api/v1/webhooks/feishu/events`
+3. 「添加事件」→ 消息与群组 → 勾选「**接收消息 im.message.receive_v1**」→ 保存
+4. ⚠️ 保存时飞书会立刻向回调地址发一条验证请求，系统必须正确应答才能保存成功；
+   所以**先把公网地址准备好再填**（见 7.4），且填完让服务保持运行
+
+**7.4 没有域名？用内网穿透变出公网地址**
+```bash
+./scripts/tunnel.sh        # 支持 cpolar（推荐，先 brew install cpolar）/ ngrok / cloudflared
+```
+- 脚本会自动把本机变成公网，并**直接打印要填的完整回调地址**，复制粘贴即可
+- ⚠️ 穿透的终端窗口**不能关**，关了公网地址就失效，群消息就收不到了
+- 免费版地址重启后会变，演示当天重新运行脚本、把新地址更新到飞书后台即可
+
+**7.5 填凭证并重启**
+- 把 App ID / App Secret 填进第 3 步的 `.env.local` 两行，保存后重启
+- 打开数据源管理页点「**🔍 检测飞书凭证**」→ 显示 ✅ 即打通
+
+**7.6 发布版本（最容易漏的一步！不发布 = 全部白配）**
+- 左侧「**版本管理与发布**」→ 创建版本（版本号随意，如 1.0.0）→ 保存 → 发布
+- 你是管理员就自己点同意；**权限、事件订阅不发布版本完全不会生效**
+- 常见报错对照：检测时提示 `232034 The app is unavailable or inactivate` 就是还没发布版本
+
+**7.7 绑定群聊，跑通闭环**
+1. 把机器人拉进你的项目群（群设置 → 添加机器人 → FlowPilot）
+2. 数据源管理页 → 项目渠道绑定 → 填该群的 `chat_id`（自检通过后页面上会列出机器人所在群，直接复制）
+3. 群里随便发一条消息 → 3 秒内出现在项目详情页 → 点「立即 AI 分析」→ 看板更新 → 超时后系统自动在群里 @责任人
 
 ---
 
@@ -134,8 +190,9 @@ export FLOWPILOT_FEISHU_APPSECRET=xxxxxxxx
 | 报错"找不到 Java" | 第 0 步没装好 | 重装 Java 后**重新打开终端窗口**再启动（旧窗口认不到新装的 Java） |
 | 登录页打不开但显示 404/白屏 | 前端资源没加载 | 确认是从 `flowpilot.jar` 同目录启动；换 Chrome 浏览器试试 |
 | AI 分析报错"50010 AI 调用失败" | 密钥/网关配置不对 | 检查 `.env.local` 里 APIKEY 是否有多余空格、BASEURL 是否完整；把 PROVIDER 改成 mock 先确认系统本身正常 |
-| 飞书检测显示 ❌ | AppID/Secret 错、应用未发布、网络不通 | 对照 docs/07 检查；先确认你电脑能打开 open.feishu.cn |
-| 群里发消息看板没反应 | 回调地址不通或群没绑定 | 检查 tunnel 是否还在运行、飞书后台回调地址是否更新、机器人是否在群里、项目是否绑定了该群 chat_id |
+| 飞书检测显示 ❌ | AppID/Secret 错、应用未发布、权限没开通 | 对照 docs/07 检查；报错 `232034 app is unavailable or inactivate` = **应用还没发布版本**，去「版本管理与发布」发布一个版本再试 |
+| 飞书后台保存回调地址报"地址非法" | 地址不是公网 HTTPS，或验证请求没被正确应答 | 用 `tunnel.sh` 生成公网地址再填；填之前确认 FlowPilot 服务在运行；localhost/127.0.0.1 飞书永远连不上 |
+| 群里发消息看板没反应 | 回调地址不通、应用未发布、权限不足或群没绑定 | ① 应用发布版本了吗 ② tunnel 窗口还开着吗 ③ 机器人还在群里吗 ④ 只开了 @机器人 权限时需 @机器人 发消息 ⑤ 项目绑定了该群 chat_id 吗 |
 | 修改配置后没生效 | 没重启 | 每次改 `.env.local` 后必须重启（关掉启动窗口重新运行 start 脚本） |
 | Windows 双击 start.bat 闪退 | Java 没装或路径问题 | 先按第 0 步检查 java -version；在文件夹地址栏输入 cmd 回车后手动运行 `java -jar flowpilot.jar` 看报错 |
 
