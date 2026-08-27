@@ -7,6 +7,37 @@
       </div>
     </div>
 
+    <!-- 飞书接入向导（评审开箱即用路径） -->
+    <div class="fp-card">
+      <div class="section-title">
+        <h2>🚀 飞书接入向导（三步打通真实闭环）</h2>
+        <el-button type="primary" size="small" :loading="testing" @click="testFeishu">
+          {{ feishuOk === null ? '🔍 检测飞书凭证' : (feishuOk ? '✅ 凭证有效，重新检测' : '❌ 检测失败，重新检测') }}
+        </el-button>
+      </div>
+      <el-alert v-if="feishuMsg" :type="feishuOk ? 'success' : 'warning'" :closable="true" style="margin-bottom:12px"
+                @close="feishuMsg = ''">
+        <template #title>{{ feishuMsg }}</template>
+      </el-alert>
+      <el-steps :active="feishuOk ? 3 : 0" simple style="margin-bottom:14px">
+        <el-step title="创建飞书应用" />
+        <el-step title="填凭证并重启" />
+        <el-step title="自检通过" />
+      </el-steps>
+      <div class="small" style="line-height:2">
+        <b>第 1 步</b>：打开 <a href="https://open.feishu.cn/app" target="_blank" style="color:var(--fp-blue-450)">飞书开发者后台</a>
+        → 创建企业自建应用 → 开通权限（im:message、im:chat、contact:user.base:readonly）→ 事件订阅
+        <code>im.message.receive_v1</code> → 发布版本（管理员审核）。详细图文步骤见
+        <a href="https://github.com/alano-666/FlowPilot/blob/main/docs/07-%E9%A3%9E%E4%B9%A6%E4%BC%81%E5%BE%AE%E6%8E%A5%E5%85%A5%E6%8C%87%E5%8D%97.md" target="_blank" style="color:var(--fp-blue-450)">docs/07</a><br>
+        <b>第 2 步</b>：在 <code>backend/.env.local</code> 填入
+        <code>FLOWPILOT_FEISHU_APPID / FLOWPILOT_FEISHU_APPSECRET</code>（已配置 AI 网关密钥的同一文件），重启服务<br>
+        <b>第 3 步</b>：点右上角「检测飞书凭证」→ 通过后把机器人加入项目群，在下方绑定群 chat_id 即可实时同步
+      </div>
+      <div v-if="feishuOk && feishuChats && feishuChats.length" class="small" style="margin-top:10px">
+        🤖 机器人所在群：<el-tag v-for="c in feishuChats" :key="c.chat_id" size="small" style="margin-right:6px">{{ c.name }}（{{ c.chat_id }}）</el-tag>
+      </div>
+    </div>
+
     <!-- 渠道接入状态 -->
     <div class="stat-grid">
       <div class="stat-tile" v-for="(v, k) in channelStatus" :key="k">
@@ -100,6 +131,25 @@ const bindType = ref('FEISHU')
 const bindChannelId = ref('')
 const boundChannels = ref([])
 const watchDir = ref('')
+const testing = ref(false)
+const feishuOk = ref(null)
+const feishuMsg = ref('')
+const feishuChats = ref([])
+
+async function testFeishu() {
+  testing.value = true
+  try {
+    const r = await api.get('/channels/feishu/test')
+    feishuOk.value = r.ok
+    feishuMsg.value = r.message
+    feishuChats.value = r.chats || []
+  } catch (e) {
+    feishuOk.value = false
+    feishuMsg.value = '检测请求失败：' + (e.message || '网络错误')
+  } finally {
+    testing.value = false
+  }
+}
 
 async function load() {
   const [status, ps, recs, watch] = await Promise.all([

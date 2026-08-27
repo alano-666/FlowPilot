@@ -18,7 +18,7 @@
     <main class="fp-main">
       <div v-if="isDemo" class="demo-banner">
         🎭 <b>演示模式</b>：当前为 GitHub Pages 静态预览版，数据为内置模拟，仅用于界面展示与飞书嵌入测试。
-        正式版（真实 AI / 聊天同步 / 回调）需部署后端服务，见项目 docs/08。
+        体验「飞书 × AI」真实运行闭环：<a href="https://github.com/alano-666/FlowPilot/releases" target="_blank" style="color:#8a6100;font-weight:700">下载开箱即用发行包</a>（零编译，3 步跑起来）。
       </div>
       <router-view />
     </main>

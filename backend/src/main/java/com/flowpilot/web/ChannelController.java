@@ -81,6 +81,32 @@ public class ChannelController {
         return ApiResponse.ok(feishuClient.listBotChats());
     }
 
+    /**
+     * 飞书凭证自检（接入向导用）：验证 app-id/app-secret 能否换取 token，
+     * 并返回机器人所在群列表，帮助确认权限与发布状态。
+     */
+    @GetMapping("/feishu/test")
+    public ApiResponse<Map<String, Object>> feishuTest() {
+        if (!feishuClient.configured()) {
+            return ApiResponse.ok(Map.of(
+                    "ok", false,
+                    "message", "尚未配置飞书凭证：请在 backend/.env.local 设置 FLOWPILOT_FEISHU_APPID / "
+                            + "FLOWPILOT_FEISHU_APPSECRET 后重启（步骤见 docs/07 第 1 章）"));
+        }
+        try {
+            List<Map<String, String>> chats = feishuClient.listBotChats();
+            return ApiResponse.ok(Map.of(
+                    "ok", true,
+                    "message", "飞书凭证有效 ✓（如群列表为空，请将机器人加入目标群并发布应用版本）",
+                    "chats", chats));
+        } catch (Exception e) {
+            return ApiResponse.ok(Map.of(
+                    "ok", false,
+                    "message", "飞书凭证校验失败：" + e.getMessage()
+                            + "（请检查 App ID/Secret 是否正确、应用是否已发布）"));
+        }
+    }
+
     /** 手动触发全渠道同步 */
     @RequireRole(User.Role.MANAGER)
     @PostMapping("/sync")

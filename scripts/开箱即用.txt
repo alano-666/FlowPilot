@@ -1,0 +1,31 @@
+# FlowPilot 开箱即用指南（发行包版）
+
+> 零编译、零安装（除 Java 外），3 步跑起来。
+
+## 1. 安装 Java（一次）
+
+- 已装 Java 17+ 跳过此步（命令行输入 `java -version` 验证）
+- 未安装：到 https://adoptium.net 下载 Temurin 17/21 安装
+
+## 2. 填配置（3 个必填，其余选填）
+
+复制 `scripts/.env.example` 为本目录 `.env.local`（Windows 同名），按注释填写：
+- `FLOWPILOT_AI_ANTHROPIC_APIKEY`：AI 密钥
+- `FLOWPILOT_FEISHU_APPID / APPSECRET`：飞书应用凭证（创建步骤见 docs/07）
+
+## 3. 启动
+
+- Mac/Linux：`./start.sh`
+- Windows：双击 `start.bat`
+- 打开 http://localhost:8080（账号 admin / admin123）
+
+## 无域名评审演示
+
+`./scripts/tunnel.sh`（内网穿透）会自动打印飞书后台要填的回调地址；
+完整 5 分钟演示话术见 `docs/10-评审演示脚本.md`。
+
+## 更多
+
+- 完整文档：docs/01~10
+- 源码：https://github.com/alano-666/FlowPilot
+- 演示站（静态预览）：https://alano-666.github.io/FlowPilot/
