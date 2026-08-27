@@ -1,31 +1,39 @@
-# FlowPilot 开箱即用指南（发行包版）
+════════════════════════════════════════════════
+  FlowPilot 流程领航员 · 开箱即用（小白 3 步版）
+════════════════════════════════════════════════
 
-> 零编译、零安装（除 Java 外），3 步跑起来。
+完整图文教程（含常见卡壳排查表）看 README.md 或仓库首页。
 
-## 1. 安装 Java（一次）
+【第 0 步 · 一次性】装 Java 17+
+  检查：终端/命令行输入 java -version
+  没有？去 https://adoptium.net 下载 Temurin 21 安装（一路下一步）
+  装完要重新打开终端窗口！
 
-- 已装 Java 17+ 跳过此步（命令行输入 `java -version` 验证）
-- 未安装：到 https://adoptium.net 下载 Temurin 17/21 安装
+【第 1 步】复制配置模板
+  Mac 终端：  cp .env.example .env.local
+  Windows：  选中 .env.example → 复制粘贴 → 改名 .env.local
 
-## 2. 填配置（3 个必填，其余选填）
+【第 2 步】填 .env.local（记事本打开，每行有中文注释）
+  必填一 · AI 密钥（没有就先全部留空 → 自动演示模式，也能跑）：
+    FLOWPILOT_AI_PROVIDER=anthropic
+    FLOWPILOT_AI_ANTHROPIC_APIKEY=你的AI密钥
+    FLOWPILOT_AI_ANTHROPIC_BASEURL=https://你的中转站地址/api/anthropic
+    FLOWPILOT_AI_ANTHROPIC_MODEL=deepseek-v4-pro
+    FLOWPILOT_AI_ANTHROPIC_STRICTSCHEMA=false
+  必填二 · 飞书凭证（接真实飞书群时填，创建应用看 docs/07）：
+    FLOWPILOT_FEISHU_APPID=cli_xxxx
+    FLOWPILOT_FEISHU_APPSECRET=xxxx
 
-复制 `scripts/.env.example` 为本目录 `.env.local`（Windows 同名），按注释填写：
-- `FLOWPILOT_AI_ANTHROPIC_APIKEY`：AI 密钥
-- `FLOWPILOT_FEISHU_APPID / APPSECRET`：飞书应用凭证（创建步骤见 docs/07）
+【第 3 步】启动
+  Mac/Linux：  ./start.sh
+  Windows：    双击 start.bat
+  看到 "Tomcat started on port 8080" 即成功，窗口别关！
+  浏览器打开 http://localhost:8080
+  账号 admin   密码 admin123
 
-## 3. 启动
+【体验】看板点进项目 → 「🎭 生成演示消息」→「🤖 立即 AI 分析」
 
-- Mac/Linux：`./start.sh`
-- Windows：双击 `start.bat`
-- 打开 http://localhost:8080（账号 admin / admin123）
+【没有域名？】./scripts/tunnel.sh 一键公网穿透，直接打印飞书回调地址
 
-## 无域名评审演示
-
-`./scripts/tunnel.sh`（内网穿透）会自动打印飞书后台要填的回调地址；
-完整 5 分钟演示话术见 `docs/10-评审演示脚本.md`。
-
-## 更多
-
-- 完整文档：docs/01~10
-- 源码：https://github.com/alano-666/FlowPilot
-- 演示站（静态预览）：https://alano-666.github.io/FlowPilot/
+【卡壳？】README 底部有 10 条常见问题对照排查表
+════════════════════════════════════════════════
