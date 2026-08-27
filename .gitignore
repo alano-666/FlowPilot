@@ -5,6 +5,9 @@ frontend/dist/
 backend/src/main/resources/static/assets/
 backend/src/main/resources/static/index.html
 
+# 本地发行包（大文件，不提交仓库）
+releases/
+
 # 本地数据（数据库/导入目录/报告）
 data/
 backend/data/
