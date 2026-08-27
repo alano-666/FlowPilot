@@ -159,8 +159,11 @@ export FLOWPILOT_FEISHU_APPSECRET=xxxxxxxx
 
 **7.4 没有域名？用内网穿透变出公网地址**
 ```bash
-./scripts/tunnel.sh        # 支持 cpolar（推荐，先 brew install cpolar）/ ngrok / cloudflared
+./scripts/tunnel.sh        # 自动选择已安装的工具
+./scripts/tunnel.sh cpolar # 指定 cpolar（国内推荐，需注册取 authtoken）
+./scripts/tunnel.sh cloudflared # 免注册（cloudflared，试试就知网络是否通）
 ```
+- 本机已装好：cpolar（`~/.local/bin/cpolar`，首次需 `cpolar authtoken <官网注册的token>`）+ cloudflared（免注册）
 - 脚本会自动把本机变成公网，并**直接打印要填的完整回调地址**，复制粘贴即可
 - ⚠️ 穿透的终端窗口**不能关**，关了公网地址就失效，群消息就收不到了
 - 免费版地址重启后会变，演示当天重新运行脚本、把新地址更新到飞书后台即可

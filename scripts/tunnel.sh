@@ -53,12 +53,21 @@ case "$TOOL" in
     done
     ;;
   cpolar)
-    if ! command -v cpolar >/dev/null 2>&1; then
-      echo "未检测到 cpolar。安装：brew install cpolar（或到 https://www.cpolar.com/ 下载图形客户端）"
-      echo "首次使用：cpolar authtoken <你的token>（cpolar 官网注册可得）"
+    # cpolar 常见安装位置（brew 无此包，官方下载解压到 ~/.local/bin）
+    CPOLAR_BIN=""
+    for candidate in "$HOME/.local/bin/cpolar" /opt/homebrew/bin/cpolar /usr/local/bin/cpolar cpolar; do
+      if command -v "$candidate" >/dev/null 2>&1 || [ -x "$candidate" ]; then
+        CPOLAR_BIN="$candidate"
+        break
+      fi
+    done
+    if [ -z "$CPOLAR_BIN" ]; then
+      echo "未检测到 cpolar。安装（Apple 芯片 Mac）："
+      echo "  mkdir -p ~/.local/bin && curl -sL https://www.cpolar.com/static/downloads/releases/latest/cpolar-stable-darwin-arm64.zip -o /tmp/cpolar.zip && unzip -o /tmp/cpolar.zip -d ~/.local/bin/ && chmod +x ~/.local/bin/cpolar"
+      echo "首次使用需注册：https://www.cpolar.com/ 注册后复制 authtoken，执行 ~/.local/bin/cpolar authtoken <你的token>"
       exit 1
     fi
-    cpolar http "$PORT" > /tmp/flowpilot-tunnel.log 2>&1 &
+    "$CPOLAR_BIN" http "$PORT" > /tmp/flowpilot-tunnel.log 2>&1 &
     TUNNEL_PID=$!
     echo "cpolar 启动中（PID $TUNNEL_PID），等待分配公网地址..."
     for i in $(seq 1 20); do
