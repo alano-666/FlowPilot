@@ -19,6 +19,7 @@ public final class JsonExtractor {
 
     /**
      * 从模型输出文本中提取 JSON 并反序列化为目标类型。
+     * 解析失败时自动尝试「截断修复」（输出被 max_tokens 切断时补齐括号，救回已生成数据）。
      * @param raw 模型原始输出
      * @param schema 目标类型（Jackson 反序列化，忽略未知字段）
      */
@@ -26,14 +27,73 @@ public final class JsonExtractor {
         if (raw == null || raw.isBlank()) {
             throw new BizException(50010, "AI " + taskName + " 返回内容为空");
         }
-        String json = repair(extractJsonObject(raw));
+        String text = raw.trim()
+                .replaceFirst("^```(json|JSON)?\\s*", "")
+                .replaceFirst("\\s*```$", "");
+        // 路径一：常规提取（完整 JSON）
+        String json = repair(extractJsonObject(text));
         try {
             return LENIENT.readValue(json, schema);
-        } catch (Exception e) {
-            // 字段级容错失败则直接报错（保留原始文本便于排查）
-            throw new BizException(50010, "AI " + taskName + " 返回的 JSON 无法解析: " + e.getMessage()
-                    + "；原始输出片段: " + snippet(raw, 200));
+        } catch (Exception ignored) {
+            // 路径二：输出被 max_tokens 截断——从第一个 { 取到文本末尾，栈式补齐括号
+            int start = text.indexOf('{');
+            if (start >= 0) {
+                String truncated = repair(repairTruncated(text.substring(start)));
+                if (truncated != null) {
+                    try {
+                        return LENIENT.readValue(truncated, schema);
+                    } catch (Exception ignored2) {
+                        // 补齐后仍失败，走下方报错
+                    }
+                }
+            }
+            throw new BizException(50010, "AI " + taskName + " 返回的 JSON 无法解析；原始输出片段: "
+                    + snippet(raw, 200));
         }
+    }
+
+    /**
+     * 截断修复：逐字符扫描（跳过字符串内部），栈式补齐缺失的 } ] 括号。
+     * 返回 null 表示无法修复。
+     */
+    static String repairTruncated(String json) {
+        StringBuilder sb = new StringBuilder(json);
+        java.util.Deque<Character> stack = new java.util.ArrayDeque<>();
+        boolean inString = false;
+        boolean escaped = false;
+        for (int i = 0; i < sb.length(); i++) {
+            char c = sb.charAt(i);
+            if (inString) {
+                if (escaped) {
+                    escaped = false;
+                } else if (c == '\\') {
+                    escaped = true;
+                } else if (c == '"') {
+                    inString = false;
+                }
+                continue;
+            }
+            switch (c) {
+                case '"' -> inString = true;
+                case '{' -> stack.push('}');
+                case '[' -> stack.push(']');
+                case '}', ']' -> {
+                    if (!stack.isEmpty() && stack.peek() == c) {
+                        stack.pop();
+                    } else {
+                        return null; // 括号错位，无法修复
+                    }
+                }
+                default -> { }
+            }
+        }
+        if (inString) {
+            sb.append('"'); // 字符串未闭合：补引号
+        }
+        while (!stack.isEmpty()) {
+            sb.append(stack.pop());
+        }
+        return sb.toString();
     }
 
     /** 提取第一个完整的 {...} 块 */

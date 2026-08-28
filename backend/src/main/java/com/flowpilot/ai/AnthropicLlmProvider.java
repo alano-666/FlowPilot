@@ -64,22 +64,24 @@ public class AnthropicLlmProvider implements LlmProvider {
     public AiSchemas.AnalysisResult analyzeProject(AnalysisContext ctx) {
         String system = PromptBuilder.analysisSystem(ctx.template());
         String user = PromptBuilder.analysisUser(ctx.project(), ctx.messages(), 200);
-        return invoke(system, user, AiSchemas.AnalysisResult.class, "项目状态识别");
+        // 分析输出较短（2-4k tokens）
+        return invoke(system, user, AiSchemas.AnalysisResult.class, 8000L, "项目状态识别");
     }
 
     @Override
     public AiSchemas.TemplateParseResult parseTemplate(TemplateParseContext ctx) {
         String system = PromptBuilder.templateParseSystem();
         String user = PromptBuilder.templateParseUser(ctx.docName(), ctx.sourceText());
-        return invoke(system, user, AiSchemas.TemplateParseResult.class, "流程模板解析");
+        // 建模输出长（节点+完成标准+角色+词库），需要更大预算防止 JSON 截断
+        return invoke(system, user, AiSchemas.TemplateParseResult.class, 16000L, "流程模板解析");
     }
 
     // ---------- 双模式入口 ----------
 
-    private <T> T invoke(String system, String user, Class<T> schema, String taskName) {
+    private <T> T invoke(String system, String user, Class<T> schema, long maxTokens, String taskName) {
         return withHardTimeout(() -> strictSchema
-                ? strictStructured(system, user, schema, taskName)
-                : lenientJson(system, user, schema, taskName), taskName);
+                ? strictStructured(system, user, schema, maxTokens, taskName)
+                : lenientJson(system, user, schema, maxTokens, taskName), taskName);
     }
 
     /** 单次 LLM 调用的强制超时线程池（SDK 超时失效时兜底，防止分析队列挂死） */
@@ -112,10 +114,10 @@ public class AnthropicLlmProvider implements LlmProvider {
     }
 
     /** 严格模式：类型化结构化输出（官方 API，服务端 Schema 校验） */
-    private <T> T strictStructured(String system, String user, Class<T> schema, String taskName) {
+    private <T> T strictStructured(String system, String user, Class<T> schema, long maxTokens, String taskName) {
         StructuredMessageCreateParams<T> params = MessageCreateParams.builder()
                 .model(model)
-                .maxTokens(16000L)
+                .maxTokens(maxTokens)
                 .thinking(ThinkingConfigAdaptive.builder().build())
                 .cacheControl(CacheControlEphemeral.builder().build())
                 .outputConfig(schema)
@@ -151,15 +153,14 @@ public class AnthropicLlmProvider implements LlmProvider {
     }
 
     /** 宽松模式：普通消息 + Schema 说明 + 本地 JSON 修复（第三方网关） */
-    private <T> T lenientJson(String system, String user, Class<T> schema, String taskName) {
+    private <T> T lenientJson(String system, String user, Class<T> schema, long maxTokens, String taskName) {
         String schemaDesc = schemaDescription(schema);
-        String fullSystem = system + "\n\n输出格式要求（JSON Schema，必须严格遵守字段名与结构）：\n" + schemaDesc;
+        String fullSystem = system + "\n\n输出格式要求（JSON Schema，必须严格遵守字段名与结构，不要输出 Schema 之外的字段）：\n" + schemaDesc;
         String fullUser = user + "\n\n请直接输出符合上述 Schema 的 JSON 对象，不要输出任何解释文字或代码块标记。";
 
         MessageCreateParams params = MessageCreateParams.builder()
                 .model(model)
-                // 分析输出实际 2-4k tokens，8k 预算足够且显著降低思考模式耗时
-                .maxTokens(8000L)
+                .maxTokens(maxTokens)
                 .thinking(ThinkingConfigAdaptive.builder().build())
                 .cacheControl(CacheControlEphemeral.builder().build())
                 .system(fullSystem)

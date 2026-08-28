@@ -62,4 +62,35 @@ class JsonExtractorTest {
         assertTrue(JsonExtractor.isValidObject("```json\n[1,2]\n```"));
         assertFalse(JsonExtractor.isValidObject("纯文字"));
     }
+
+    @Test
+    void repairsTruncatedOutput() {
+        // 模拟 max_tokens 截断：nodes 数组写到一半被切断
+        String truncated = "{\"flow_name\":\"测试流程\",\"nodes\":[{\"key\":\"a\",\"name\":\"步骤A\"},{\"key\":\"b\",\"name\":\"步骤B\"";
+        Sample s = JsonExtractor.extract(truncated, Sample.class, "测试");
+        assertEquals("测试流程", s.flow_name());
+        assertEquals(2, s.nodes().size());
+        assertEquals("步骤B", s.nodes().get(1).name());
+    }
+
+    @Test
+    void repairsTruncatedUnclosedString() {
+        String truncated = "{\"flow_name\":\"测试\",\"nodes\":[{\"key\":\"a\",\"name\":\"未完";
+        Sample s = JsonExtractor.extract(truncated, Sample.class, "测试");
+        assertEquals("测试", s.flow_name());
+        assertEquals(1, s.nodes().size());
+    }
+
+    @Test
+    void repairTruncatedReturnsNullOnMismatch() {
+        assertNull(JsonExtractor.repairTruncated("{\"a\":1]}"));
+        assertNull(JsonExtractor.repairTruncated("[{]}"));
+    }
+
+    @Test
+    void repairTruncatedIgnoresQuotedBrackets() {
+        String fixed = JsonExtractor.repairTruncated("{\"text\":\"[未闭合}内容\"}");
+        assertNotNull(fixed);
+        assertTrue(fixed.startsWith("{\"text\":"));
+    }
 }
