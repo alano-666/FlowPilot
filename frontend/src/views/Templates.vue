@@ -120,7 +120,7 @@ async function doParse() {
     } else {
       t = await api.post('/templates/parse-feishu', { docUrl: feishuUrl.value })
     }
-    ElMessage.success('AI 建模完成，请确认草稿')
+    showParseResult(t)
     parseVisible.value = false
     file.value = null
     feishuUrl.value = ''
@@ -128,12 +128,23 @@ async function doParse() {
   } catch (e) { /* 拦截器已提示 */ } finally { parsing.value = false }
 }
 
+/** 建模结果提示：附带文档提取字数，提取过少时提醒检查文件 */
+function showParseResult(t) {
+  const preview = t.extractedTextPreview || ''
+  const nodeCount = (() => { try { return JSON.parse(t.nodesJson || '[]').length } catch { return 0 } })()
+  if (preview.trim().length < 50) {
+    ElMessage.warning(`⚠️ 从文件中提取到的文字很少（${preview.trim().length} 字），可能正文在文本框/图片中或文件是扫描件，建议改用 Word 正文或 Markdown`)
+  } else {
+    ElMessage.success(`✅ AI 建模完成：文档提取 ${preview.trim().length} 字，识别 ${nodeCount} 个节点，请确认草稿`)
+  }
+}
+
 async function doParseText() {
   if (!pasteText.value.trim()) { ElMessage.warning('请粘贴文档内容'); return }
   parsing.value = true
   try {
     const t = await api.post('/templates/parse-text', { docName: pasteDocName.value, text: pasteText.value })
-    ElMessage.success('AI 建模完成，请确认草稿')
+    showParseResult(t)
     pasteVisible.value = false
     pasteText.value = ''
     router.push(`/templates/${t.id}/edit`)

@@ -61,6 +61,10 @@ public class FlowTemplate {
     @Column(length = 256)
     private String sourceDocName;
 
+    /** 文档提取文本预览（仅响应展示用，不入库），供前端判断文件解析是否完整 */
+    @Transient
+    private String extractedTextPreview;
+
     @Column(length = 64)
     private String createdBy;
 
@@ -88,6 +92,8 @@ public class FlowTemplate {
     public void setGlossaryJson(String glossaryJson) { this.glossaryJson = glossaryJson; }
     public String getSourceDocName() { return sourceDocName; }
     public void setSourceDocName(String sourceDocName) { this.sourceDocName = sourceDocName; }
+    public String getExtractedTextPreview() { return extractedTextPreview; }
+    public void setExtractedTextPreview(String extractedTextPreview) { this.extractedTextPreview = extractedTextPreview; }
     public String getCreatedBy() { return createdBy; }
     public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
     public LocalDateTime getCreatedAt() { return createdAt; }

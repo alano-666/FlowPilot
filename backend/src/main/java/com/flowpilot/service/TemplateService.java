@@ -69,7 +69,10 @@ public class TemplateService {
     public FlowTemplate parseAndCreate(String docName, String text, String createdBy) {
         AiSchemas.TemplateParseResult parsed = llmFactory.get()
                 .parseTemplate(new LlmProvider.TemplateParseContext(docName, text));
-        return fromParseResult(docName, parsed, createdBy, null);
+        FlowTemplate t = fromParseResult(docName, parsed, createdBy, null);
+        // 附带提取文本预览（前端据此提示文件解析是否完整）
+        t.setExtractedTextPreview(text.length() > 300 ? text.substring(0, 300) + "…" : text);
+        return t;
     }
 
     /** 解析结果 → 草稿模板（AI 解析、Mock 解析共用） */

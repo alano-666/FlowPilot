@@ -30,7 +30,8 @@ if (isDemo) {
 } else {
   api = axios.create({
     baseURL: '/api/v1',
-    timeout: 180000
+    // 文档解析/分析最长可能数分钟，超时给足（网络错误时给明确提示）
+    timeout: 360000
   })
 
   api.interceptors.request.use(config => {
@@ -56,7 +57,15 @@ if (isDemo) {
       return body.data
     },
     err => {
-      const msg = err.response?.data?.message || err.message || '网络错误'
+      let msg
+      if (err.code === 'ECONNABORTED' || String(err.message).includes('timeout')) {
+        msg = '请求超时（AI 解析大文档可能需要几分钟），请稍后重试或拆分文档'
+      } else if (!err.response) {
+        msg = '网络连接失败：请确认服务已启动（http://localhost:8080 能打开），' +
+              '且未通过公网隧道执行大文件解析（隧道对长请求不稳定，建议用 localhost 操作）'
+      } else {
+        msg = err.response?.data?.message || err.message || '网络错误'
+      }
       ElMessage.error(msg)
       return Promise.reject(err)
     }

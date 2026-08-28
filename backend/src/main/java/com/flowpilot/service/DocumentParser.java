@@ -41,10 +41,12 @@ public class DocumentParser {
         return clean(text);
     }
 
-    /** Word 解析：段落 + 表格（表格以 | 分隔行输出） */
+    /** Word 解析：段落 + 表格 + 文本框（文本框是常见漏提场景） */
     private String parseDocx(byte[] content) {
-        try (InputStream in = new ByteArrayInputStream(content);
-             XWPFDocument doc = new XWPFDocument(in)) {
+        try (java.io.InputStream in = new ByteArrayInputStream(content);
+             org.apache.poi.openxml4j.opc.OPCPackage pkg =
+                     org.apache.poi.openxml4j.opc.OPCPackage.open(in);
+             XWPFDocument doc = new XWPFDocument(pkg)) {
             StringBuilder sb = new StringBuilder();
             for (var item : doc.getBodyElements()) {
                 if (item instanceof XWPFParagraph p) {
@@ -59,7 +61,14 @@ public class DocumentParser {
                     }
                 }
             }
-            return sb.toString();
+            // 文本框内容（POI 高层 API 不覆盖，需从底层 XML 提取）
+            sb.append(extractTextBoxText(readDocumentXml(pkg)));
+            String text = sb.toString();
+            if (text.isBlank()) {
+                throw new BizException(40004, "Word 文档未提取到文本：正文可能放在图片/文本框/形状中，"
+                        + "请直接把文字写在正文里另存后重试");
+            }
+            return text;
         } catch (BizException e) {
             throw e;
         } catch (Exception e) {
@@ -67,7 +76,47 @@ public class DocumentParser {
         }
     }
 
-    /** PDF 解析（文本型 PDF；扫描件返回提示） */
+    private String readDocumentXml(org.apache.poi.openxml4j.opc.OPCPackage pkg) {
+        try {
+            for (org.apache.poi.openxml4j.opc.PackagePart part : pkg.getParts()) {
+                if ("/word/document.xml".equals(part.getPartName().getName())) {
+                    try (java.io.InputStream is = part.getInputStream()) {
+                        return new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                    }
+                }
+            }
+            return "";
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    /** 从 docx 底层 XML 提取文本框（w:txbxContent）内的文本（static 便于单测） */
+    static String extractTextBoxText(String documentXml) {
+        if (documentXml == null || documentXml.isBlank()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        java.util.regex.Pattern box = java.util.regex.Pattern.compile(
+                "<w:txbxContent>(.*?)</w:txbxContent>", java.util.regex.Pattern.DOTALL);
+        java.util.regex.Pattern run = java.util.regex.Pattern.compile(
+                "<w:t[^>]*>([^<]*)</w:t>");
+        java.util.regex.Matcher m = box.matcher(documentXml);
+        while (m.find()) {
+            java.util.regex.Matcher t = run.matcher(m.group(1));
+            boolean hasText = false;
+            while (t.find()) {
+                sb.append(t.group(1));
+                hasText = true;
+            }
+            if (hasText) {
+                sb.append('\n');
+            }
+        }
+        return sb.toString();
+    }
+
+    /** PDF 解析（文本型 PDF；文本过少疑似扫描件时给出明确提示） */
     private String parsePdf(byte[] content) {
         try (PDDocument doc = PDDocument.load(content)) {
             if (doc.isEncrypted()) {
@@ -77,6 +126,10 @@ public class DocumentParser {
             String text = stripper.getText(doc);
             if (text.isBlank()) {
                 throw new BizException(40004, "PDF 未提取到文本（可能是扫描件），请先 OCR 或改用 Word/Markdown 上传");
+            }
+            if (text.replaceAll("\\s", "").length() < 100) {
+                throw new BizException(40004, "PDF 仅提取到少量文字（疑似扫描件/图片型 PDF，正文无法读取）。"
+                        + "请改用 Word/Markdown 重新上传，或先对 PDF 做 OCR");
             }
             return text;
         } catch (BizException e) {
