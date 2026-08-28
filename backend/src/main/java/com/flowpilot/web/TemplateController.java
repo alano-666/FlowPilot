@@ -105,6 +105,14 @@ public class TemplateController {
         return ApiResponse.ok(templateService.archive(id));
     }
 
+    /** 删除模板（仅限未被项目引用的模板） */
+    @RequireRole(User.Role.MANAGER)
+    @DeleteMapping("/{id}")
+    public ApiResponse<Void> delete(@PathVariable Long id) {
+        templateService.delete(id);
+        return ApiResponse.ok();
+    }
+
     /** 复制模板 */
     @PostMapping("/{id}/duplicate")
     public ApiResponse<FlowTemplate> duplicate(@PathVariable Long id) {

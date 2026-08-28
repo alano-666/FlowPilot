@@ -87,37 +87,65 @@
       </el-table>
     </div>
 
-    <!-- 项目渠道绑定 -->
+    <!-- 项目渠道矩阵（一个项目可绑多群、多类型渠道） -->
     <div class="fp-card">
       <div class="section-title">
-        <h2>项目渠道绑定</h2>
+        <h2>🔗 项目渠道矩阵（一项目多渠道：多飞书群 + 企微群 + 微信导入 + 邮件）</h2>
         <div class="gap8">
-          <el-select v-model="bindProjectId" placeholder="选择项目" style="width:260px">
-            <el-option v-for="p in projects" :key="p.id" :label="p.name" :value="p.id" />
+          <el-select v-model="bindProjectId" placeholder="选择项目查看/添加渠道" style="width:300px" @change="onProjectChange">
+            <el-option v-for="p in projects" :key="p.id" :label="`${p.name}（${p.customerName || '未填客户'}）`" :value="p.id" />
           </el-select>
-          <el-select v-model="bindType" style="width:150px">
-            <el-option label="飞书群" value="FEISHU" />
-            <el-option label="企微群" value="WECOM" />
-          </el-select>
-          <el-input v-model="bindChannelId" placeholder="chat_id / 群ID" style="width:200px" />
-          <el-button type="primary" @click="bindChannel">绑定</el-button>
         </div>
       </div>
-      <div v-if="boundChannels.length" class="gap8" style="flex-wrap:wrap">
-        <el-tag v-for="c in boundChannels" :key="c.id" closable size="large"
-                :type="c.syncEnabled ? 'primary' : 'info'"
-                @close="unbind(c)">
-          {{ channelLabel(c.channelType) }}：{{ c.channelName }}
-          <span class="muted small">{{ c.syncEnabled ? '' : '（已停用）' }}</span>
-        </el-tag>
-      </div>
-      <div v-else class="small muted">尚未绑定任何渠道。飞书群 ID 可联系管理员在飞书开放平台查询，或在机器人被加入群后调用「获取群列表」。</div>
+
+      <template v-if="bindProjectId">
+        <!-- 已绑渠道（按类型分组） -->
+        <div class="small muted" style="margin-bottom:8px">已绑定渠道（点击 ✕ 解绑；飞书群可绑定多个，全部会同步并进入 AI 分析）：</div>
+        <div class="gap8" style="flex-wrap:wrap;margin-bottom:14px">
+          <template v-for="c in boundChannels" :key="c.id">
+            <el-tag size="large" closable
+                    :type="c.channelType === 'FEISHU' ? 'primary' : c.channelType === 'WECOM' ? 'success' : 'info'"
+                    @close="unbind(c)">
+              {{ channelTypeLabel(c.channelType) }}：{{ c.channelName || c.channelId }}
+              <span v-if="!c.syncEnabled" class="muted small">（已停用）</span>
+              <span v-if="c.channelType === 'FEISHU' && c.lastSyncAt" class="muted small">· {{ fmt(c.lastSyncAt) }} 同步过</span>
+            </el-tag>
+          </template>
+          <span v-if="!boundChannels.length" class="muted small">尚未绑定渠道</span>
+        </div>
+
+        <!-- 添加渠道 -->
+        <div class="gap8" style="flex-wrap:wrap">
+          <el-select v-model="bindType" style="width:140px">
+            <el-option label="🕊️ 飞书群" value="FEISHU" />
+            <el-option label="💼 企微群" value="WECOM" />
+          </el-select>
+          <template v-if="bindType === 'FEISHU'">
+            <!-- 飞书：下拉直选机器人所在群（自动拉取） -->
+            <el-select v-model="bindChannelId" placeholder="选择机器人所在的飞书群" style="width:320px" filterable
+                       @visible-change="visible => { if (visible) loadFeishuChats() }">
+              <el-option v-for="chat in feishuChatOptions" :key="chat.chat_id"
+                         :label="`${chat.name}（${chat.chat_id}）`" :value="chat.chat_id" />
+            </el-select>
+            <el-input v-model="bindChannelId" placeholder="或手动粘贴 chat_id" style="width:220px" clearable />
+          </template>
+          <el-input v-else v-model="bindChannelId" placeholder="企微群 ID（可从企微管理后台群详情获取）" style="width:340px" />
+          <el-button type="primary" :loading="binding" @click="bindChannel">＋ 绑定渠道</el-button>
+          <el-button size="small" text type="info" @click="loadFeishuChats" v-if="bindType === 'FEISHU'">刷新群列表</el-button>
+        </div>
+        <div class="small muted" style="margin-top:10px;line-height:1.8">
+          💡 多渠道说明：飞书群可绑 <b>多个</b>（每个群的消息都会同步并参与 AI 分析）；
+          企微群可绑多个（@机器人消息实时入库，全量消息见 docs/企业微信接入说明）；
+          微信导入文件与邮箱邮件<b>按项目名/客户名自动匹配归属</b>，无需手动绑定。
+        </div>
+      </template>
+      <el-empty v-else description="先选择一个项目查看其渠道" :image-size="60" />
     </div>
   </div>
 </template>
 
 <script setup>
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import api from '../api'
 
@@ -130,7 +158,25 @@ const bindProjectId = ref(null)
 const bindType = ref('FEISHU')
 const bindChannelId = ref('')
 const boundChannels = ref([])
+const feishuChatOptions = ref([])
+const binding = ref(false)
 const watchDir = ref('')
+
+async function onProjectChange() {
+  bindChannelId.value = ''
+  if (!bindProjectId.value) { boundChannels.value = []; return }
+  const d = await api.get(`/projects/${bindProjectId.value}`)
+  boundChannels.value = d.channels.filter(c => c.channelType !== 'WECHAT_IMPORT')
+}
+
+/** 拉取机器人所在飞书群（绑定渠道下拉直选） */
+async function loadFeishuChats() {
+  try {
+    feishuChatOptions.value = await api.get('/channels/feishu/chats')
+  } catch (e) {
+    // 未配置飞书时提示由拦截器处理
+  }
+}
 const testing = ref(false)
 const feishuOk = ref(null)
 const feishuMsg = ref('')
@@ -164,11 +210,7 @@ async function load() {
   watchDir.value = watch.watchDir
 }
 
-watch(bindProjectId, async id => {
-  if (!id) { boundChannels.value = []; return }
-  const d = await api.get(`/projects/${id}`)
-  boundChannels.value = d.channels.filter(c => c.channelType !== 'WECHAT_IMPORT')
-})
+// 项目切换时刷新渠道列表（见 onProjectChange，由模板 @change 触发）
 
 async function syncAll() {
   syncing.value = true
@@ -189,21 +231,33 @@ async function onFileChosen(f) {
 }
 
 async function bindChannel() {
-  if (!bindProjectId.value || !bindChannelId.value) { ElMessage.warning('请填写项目和渠道 ID'); return }
-  await api.post(`/projects/${bindProjectId.value}/channels`, {
-    channelType: bindType.value, channelId: bindChannelId.value
-  })
-  ElMessage.success('绑定成功')
-  bindChannelId.value = ''
-  load()
+  if (!bindProjectId.value || !bindChannelId.value) { ElMessage.warning('请选择项目和渠道'); return }
+  binding.value = true
+  try {
+    // 从群列表取群名作为渠道名（飞书）
+    let name = bindChannelId.value
+    if (bindType.value === 'FEISHU') {
+      const hit = feishuChatOptions.value.find(c => c.chat_id === bindChannelId.value)
+      if (hit) name = hit.name
+    }
+    await api.post(`/projects/${bindProjectId.value}/channels`, {
+      channelType: bindType.value, channelId: bindChannelId.value, channelName: name
+    })
+    ElMessage.success('绑定成功，该渠道消息将进入 AI 分析')
+    bindChannelId.value = ''
+    onProjectChange()
+  } catch (e) { /* 拦截器已提示 */ } finally { binding.value = false }
 }
 
 async function unbind(c) {
   await api.delete(`/projects/${c.projectId}/channels/${c.id}`)
   ElMessage.success('已解绑')
-  load()
+  onProjectChange()
 }
 
+function channelTypeLabel(t) {
+  return { FEISHU: '🕊️ 飞书群', WECOM: '💼 企微群', WECHAT_IMPORT: '💬 微信导入', MOCK: '🎭 演示' }[t] || t
+}
 function channelLabel(k) {
   return { feishu: '🕊️ 飞书', wecom: '💼 企业微信', wechat: '💬 微信个人版', email: '📧 邮件', mock: '🎭 演示渠道' }[k] || k
 }

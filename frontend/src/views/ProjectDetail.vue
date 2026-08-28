@@ -234,7 +234,7 @@ const script = ref([])
 const selectedScene = ref(1)
 
 async function openCast() {
-  script.value = await api.get('/casting/script')
+  script.value = await api.get('/projects/casting/script')
   selectedScene.value = script.value[0]?.number || 1
   castVisible.value = true
 }

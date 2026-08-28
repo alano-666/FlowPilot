@@ -18,4 +18,6 @@ public interface ProjectRepository extends JpaRepository<Project, Long>, JpaSpec
     boolean existsByCode(String code);
 
     boolean existsByName(String name);
+
+    boolean existsByTemplateId(Long templateId);
 }

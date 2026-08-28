@@ -36,16 +36,19 @@ public class TemplateService {
 
     private final FlowTemplateRepository templateRepository;
     private final TemplateVersionRepository versionRepository;
+    private final com.flowpilot.repository.ProjectRepository projectRepository;
     private final DocumentParser documentParser;
     private final LlmFactory llmFactory;
     private final FeishuClient feishuClient;
 
     public TemplateService(FlowTemplateRepository templateRepository,
                            TemplateVersionRepository versionRepository,
+                           com.flowpilot.repository.ProjectRepository projectRepository,
                            DocumentParser documentParser, LlmFactory llmFactory,
                            FeishuClient feishuClient) {
         this.templateRepository = templateRepository;
         this.versionRepository = versionRepository;
+        this.projectRepository = projectRepository;
         this.documentParser = documentParser;
         this.llmFactory = llmFactory;
         this.feishuClient = feishuClient;
@@ -168,6 +171,21 @@ public class TemplateService {
         t.setStatus(FlowTemplate.Status.ARCHIVED);
         t.setUpdatedAt(LocalDateTime.now());
         return templateRepository.save(t);
+    }
+
+    /**
+     * 物理删除模板：仅允许删除未被项目引用的模板；
+     * 已被引用的模板建议停用（ARCHIVED）而非删除，保证历史项目数据完整。
+     */
+    @Transactional
+    public void delete(Long id) {
+        FlowTemplate t = get(id);
+        if (projectRepository.existsByTemplateId(id)) {
+            throw new BizException(40911, "该模板已被 " + "项目引用，不能删除。"
+                    + "如需停用请点「停用」；如确需删除请先删除或更换关联项目");
+        }
+        versionRepository.findByTemplateIdOrderByVersionDesc(id).forEach(versionRepository::delete);
+        templateRepository.delete(t);
     }
 
     public List<TemplateVersion> versions(Long id) {

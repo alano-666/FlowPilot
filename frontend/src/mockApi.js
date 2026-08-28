@@ -385,7 +385,7 @@ async function handle(method, url, data, params) {
   }
 
   if (url === '/channels/status') return channelStatus
-  if (url === '/casting/script') {
+  if (url === '/projects/casting/script') {
     return [
       { number: 1, title: '需求收集', description: '客户提需求，产品接单', lines: [{}] },
       { number: 2, title: '需求评审', description: '三方评审，结论基本通过但留了尾巴', lines: [{}] },

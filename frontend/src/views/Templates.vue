@@ -37,12 +37,13 @@
         <el-table-column prop="updatedAt" label="更新时间" width="150">
           <template #default="{ row }">{{ fmt(row.updatedAt) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="240" fixed="right">
+        <el-table-column label="操作" width="280" fixed="right">
           <template #default="{ row }">
             <el-button size="small" @click="$router.push(`/templates/${row.id}/edit`)">编辑</el-button>
             <el-button v-if="row.status !== 'ACTIVE'" size="small" type="success" @click="publish(row)">发布</el-button>
             <el-button v-if="row.status === 'ACTIVE'" size="small" type="warning" @click="archive(row)">停用</el-button>
             <el-button size="small" @click="duplicate(row)">复制</el-button>
+            <el-button size="small" type="danger" @click="remove(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -85,7 +86,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import api from '../api'
 
 const router = useRouter()
@@ -164,6 +165,17 @@ async function archive(row) {
 async function duplicate(row) {
   await api.post(`/templates/${row.id}/duplicate`)
   ElMessage.success('已复制为新草稿')
+  load()
+}
+
+async function remove(row) {
+  try {
+    await ElMessageBox.confirm(
+      `确定删除模板「${row.name}」吗？被项目引用过的模板无法删除（会被拒绝）。`,
+      '删除确认', { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' })
+  } catch { return }
+  await api.delete(`/templates/${row.id}`)
+  ElMessage.success('模板已删除')
   load()
 }
 
