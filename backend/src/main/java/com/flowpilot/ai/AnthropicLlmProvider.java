@@ -77,9 +77,38 @@ public class AnthropicLlmProvider implements LlmProvider {
     // ---------- 双模式入口 ----------
 
     private <T> T invoke(String system, String user, Class<T> schema, String taskName) {
-        return strictSchema
+        return withHardTimeout(() -> strictSchema
                 ? strictStructured(system, user, schema, taskName)
-                : lenientJson(system, user, schema, taskName);
+                : lenientJson(system, user, schema, taskName), taskName);
+    }
+
+    /** 单次 LLM 调用的强制超时线程池（SDK 超时失效时兜底，防止分析队列挂死） */
+    private static final java.util.concurrent.ExecutorService HARD_TIMEOUT_POOL =
+            java.util.concurrent.Executors.newCachedThreadPool(r -> {
+                Thread t = new Thread(r, "llm-call");
+                t.setDaemon(true);
+                return t;
+            });
+
+    /** 外层硬超时兜底：无论 SDK/网关行为如何，180 秒内必须返回结果（大输入分析请求实测可达 1-3 分钟） */
+    private <T> T withHardTimeout(java.util.function.Supplier<T> call, String taskName) {
+        java.util.concurrent.Future<T> future = HARD_TIMEOUT_POOL.submit(call::get);
+        try {
+            return future.get(180, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (java.util.concurrent.TimeoutException e) {
+            future.cancel(true);
+            throw new BizException(50010, "AI " + taskName + " 调用超时（180 秒），请稍后重试");
+        } catch (InterruptedException e) {
+            future.cancel(true);
+            Thread.currentThread().interrupt();
+            throw new BizException(50010, "AI " + taskName + " 调用被中断");
+        } catch (java.util.concurrent.ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof BizException biz) {
+                throw biz;
+            }
+            throw new BizException(50010, "AI " + taskName + " 调用异常: " + cause.getMessage());
+        }
     }
 
     /** 严格模式：类型化结构化输出（官方 API，服务端 Schema 校验） */
@@ -129,7 +158,8 @@ public class AnthropicLlmProvider implements LlmProvider {
 
         MessageCreateParams params = MessageCreateParams.builder()
                 .model(model)
-                .maxTokens(16000L)
+                // 分析输出实际 2-4k tokens，8k 预算足够且显著降低思考模式耗时
+                .maxTokens(8000L)
                 .thinking(ThinkingConfigAdaptive.builder().build())
                 .cacheControl(CacheControlEphemeral.builder().build())
                 .system(fullSystem)

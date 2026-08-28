@@ -67,6 +67,9 @@ public class AnalysisService {
     /** 项目分析互斥：同一项目同时只允许一次分析 */
     private final Set<Long> runningProjects = ConcurrentHashMap.newKeySet();
 
+    /** 分析排队：分析进行中收到的新触发，待当前完成后合并补跑一次 */
+    private final Set<Long> queuedProjects = ConcurrentHashMap.newKeySet();
+
     public AnalysisService(LlmFactory llmFactory, FlowPilotProperties props,
                            ProjectRepository projectRepository, FlowTemplateRepository templateRepository,
                            MessageRepository messageRepository, AnalysisRunRepository runRepository,
@@ -89,7 +92,9 @@ public class AnalysisService {
     /** 异步分析（事件回调/导入触发/定时任务用），同项目并发自动去重 */
     public void analyzeAsync(Long projectId, String trigger) {
         if (!runningProjects.add(projectId)) {
-            log.info("项目 {} 已有分析进行中，跳过", projectId);
+            // 已有分析进行中：合并排队，当前完成后补跑（避免连播场景丢分析）
+            queuedProjects.add(projectId);
+            log.info("项目 {} 分析进行中，新触发已合并排队", projectId);
             return;
         }
         aiExecutor.execute(() -> {
@@ -97,16 +102,27 @@ public class AnalysisService {
                 analyze(projectId, "SCHEDULE".equals(trigger) ? AnalysisRun.TriggerType.SCHEDULE
                         : "EVENT".equals(trigger) ? AnalysisRun.TriggerType.EVENT
                         : AnalysisRun.TriggerType.MANUAL);
+            } catch (BizException e) {
+                if (e.getCode() == 40901) {
+                    log.info("项目 {} 无新增消息，跳过分析", projectId);
+                } else {
+                    log.error("项目 {} 异步分析失败: {}", projectId, e.getMessage());
+                }
             } catch (Exception e) {
                 log.error("项目 {} 异步分析失败", projectId, e);
             } finally {
                 runningProjects.remove(projectId);
+                // 合并排队：分析期间有新消息到达，补跑一次覆盖全部增量
+                if (queuedProjects.remove(projectId)) {
+                    analyzeAsync(projectId, trigger);
+                }
             }
         });
     }
 
-    /** 同步分析（手动触发用），返回本次分析结果 */
-    @Transactional
+    /** 同步分析（手动触发用），返回本次分析结果。
+     *  注意：不加 @Transactional——AI 调用可能长达数十秒，
+     *  长事务会持有数据库写锁导致消息写入/看板查询阻塞，各保存操作各自提交。 */
     public AnalysisRun analyze(Long projectId, AnalysisRun.TriggerType triggerType) {
         return analyzeWith(projectId, triggerType, llmFactory.get());
     }
@@ -115,18 +131,25 @@ public class AnalysisService {
      * 指定 Provider 的分析（演示数据初始化用：固定 Mock 引擎，快速免费且确定性，
      * 与线上 AI Provider 解耦）。
      */
-    @Transactional
     public AnalysisRun analyzeWith(Long projectId, AnalysisRun.TriggerType triggerType, LlmProvider llm) {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new BizException(40401, "项目不存在: " + projectId));
         FlowTemplate template = templateRepository.findById(project.getTemplateId())
                 .orElseThrow(() -> new BizException(40402, "项目关联的流程模板不存在，请检查模板状态"));
 
-        // 1. 增量消息收集（水位线）
+        // 1. 增量消息收集（水位线）：无新消息时把运行记录标记为 FAILED 后返回，
+        //    避免留下永久的 RUNNING 僵尸记录
         List<Message> allNew = messageRepository.findByProjectIdAndSentAtAfterOrderBySentAtAsc(
                 projectId, project.getLastAnalyzedAt() == null ? LocalDateTime.of(2000, 1, 1, 0, 0)
                         : project.getLastAnalyzedAt());
         if (allNew.isEmpty()) {
+            AnalysisRun skipped = new AnalysisRun();
+            skipped.setProjectId(projectId);
+            skipped.setTriggerType(triggerType);
+            skipped.setStatus(AnalysisRun.Status.FAILED);
+            skipped.setErrorMsg("没有新增聊天记录，无需分析");
+            skipped.setFinishedAt(LocalDateTime.now());
+            runRepository.save(skipped);
             throw new BizException(40901, "没有新增聊天记录，无需分析");
         }
 
@@ -188,9 +211,13 @@ public class AnalysisService {
             insightRepository.save(insight);
         }
 
-        // 7. 干系人更新（按 节点+角色+姓名 去重 upsert）
+        // 7. 干系人更新：AI 解析 + 消息内【干系人】标记兜底解析（双路合并，按 节点+角色+姓名 去重）
         if (!project.isManualLock()) {
-            upsertStakeholders(projectId, result.stakeholders_update());
+            List<AiSchemas.AnalysisResult.StakeholderUpdate> marked = extractMarkedStakeholders(context);
+            List<AiSchemas.AnalysisResult.StakeholderUpdate> merged = new ArrayList<>();
+            merged.addAll(result.stakeholders_update() == null ? List.of() : result.stakeholders_update());
+            merged.addAll(marked);
+            upsertStakeholders(projectId, merged);
         }
 
         // 8. 联动通知
@@ -207,7 +234,7 @@ public class AnalysisService {
 
     // ---------- 结果规范化 ----------
 
-    private record Normalized(AiSchemas.AnalysisResult result, Set<String> completedBefore) {
+    private record Normalized(AiSchemas.AnalysisResult result, Set<String> completedBefore, String fallbackActivity) {
     }
 
     /** 校验 AI 结果：节点 key 必须存在于模板，progress 归一化，风险状态归一化 */
@@ -236,6 +263,18 @@ public class AnalysisService {
         if (!risk.matches("normal|warning|blocked")) {
             risk = "normal";
         }
+        // 活动摘要回退：取最近一条非标记消息
+        String fallback = "";
+        for (int i = context.size() - 1; i >= 0; i--) {
+            Message last = context.get(i);
+            String c = last.getContent() == null ? "" : last.getContent();
+            if (c.startsWith("【干系人】") || c.startsWith("【风险】") || c.startsWith("【下一步】")) {
+                continue;
+            }
+            fallback = (last.getSenderName() == null ? "未知" : last.getSenderName())
+                    + ": " + (c.length() > 60 ? c.substring(0, 60) + "…" : c);
+            break;
+        }
 
         return new Normalized(new AiSchemas.AnalysisResult(
                 current, new ArrayList<>(completed), progress, risk,
@@ -244,7 +283,7 @@ public class AnalysisService {
                 result.risks() == null ? List.of() : result.risks(),
                 result.suggested_next_action(),
                 result.temp_nodes() == null ? List.of() : result.temp_nodes(),
-                result.latest_activity()), new HashSet<>());
+                result.latest_activity()), new HashSet<>(), fallback);
     }
 
     /** 应用分析结果到项目 */
@@ -253,11 +292,35 @@ public class AnalysisService {
         project.setCurrentNodeKey(r.current_node_key());
         project.setProgress(r.progress());
         project.setRiskStatus(Project.RiskStatus.valueOf(r.risk_status().toUpperCase()));
-        project.setLatestActivity(r.latest_activity());
+        // 最近动态：AI 未给出时回退取最近一条消息摘要
+        String activity = r.latest_activity();
+        if (activity == null || activity.isBlank()) {
+            activity = normalized.fallbackActivity();
+        }
+        project.setLatestActivity(activity);
         project.setLastActivityAt(LocalDateTime.now());
         project.setLastAnalyzedAt(LocalDateTime.now());
         project.setUpdatedAt(LocalDateTime.now());
         projectRepository.save(project);
+    }
+
+    /** 消息内【干系人】姓名|角色|平台|ID 标记的兜底解析（不依赖 AI 是否解析该格式） */
+    private List<AiSchemas.AnalysisResult.StakeholderUpdate> extractMarkedStakeholders(List<Message> context) {
+        java.util.regex.Pattern p = java.util.regex.Pattern.compile(
+                "【干系人】([^|]+)\\|([^|]+)\\|([^|]+)\\|([^|\\s]+)");
+        List<AiSchemas.AnalysisResult.StakeholderUpdate> out = new ArrayList<>();
+        for (Message m : context) {
+            if (m.getContent() == null) {
+                continue;
+            }
+            java.util.regex.Matcher matcher = p.matcher(m.getContent());
+            while (matcher.find()) {
+                out.add(new AiSchemas.AnalysisResult.StakeholderUpdate(
+                        null, matcher.group(2).trim(), matcher.group(1).trim(),
+                        matcher.group(3).trim().toLowerCase(), matcher.group(4).trim()));
+            }
+        }
+        return out;
     }
 
     private void upsertStakeholders(Long projectId, List<AiSchemas.AnalysisResult.StakeholderUpdate> updates) {

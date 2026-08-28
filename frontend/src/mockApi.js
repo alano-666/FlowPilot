@@ -385,6 +385,27 @@ async function handle(method, url, data, params) {
   }
 
   if (url === '/channels/status') return channelStatus
+  if (url === '/casting/script') {
+    return [
+      { number: 1, title: '需求收集', description: '客户提需求，产品接单', lines: [{}] },
+      { number: 2, title: '需求评审', description: '三方评审，结论基本通过但留了尾巴', lines: [{}] },
+      { number: 3, title: '方案设计', description: '技术方案评审通过', lines: [{}] },
+      { number: 4, title: '开发实现', description: '开发进展模糊，自我感觉良好', lines: [{}] },
+      { number: 5, title: '回归测试', description: '测试结果含糊，疑似环境问题', lines: [{}] },
+      { number: 6, title: '客户验收', description: '客户基本满意但提了小意见', lines: [{}] },
+      { number: 7, title: '生产部署', description: '部署完成但出现波动，虚惊一场', lines: [{}] },
+      { number: 8, title: '上线验证', description: '验证通过，流程关闭', lines: [{}] }
+    ]
+  }
+  if (url.match(/^\/projects\/\d+\/cast$/)) {
+    const id = Number(url.match(/^\/projects\/(\d+)\//)[1])
+    const p = projects.find(x => x.id === id)
+    if (p) {
+      p.latestActivity = '【群演】第' + (data.scene || 1) + '幕正在上演…'
+      p.updatedAt = new Date().toISOString()
+    }
+    return { casted: 3 }
+  }
   if (url === '/channels/sync') return { syncedMessages: 2, syncedEmails: 0 }
   if (url === '/imports') return page(importRecords, params)
   if (url === '/imports/watch-status') {
