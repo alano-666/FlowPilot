@@ -346,8 +346,11 @@ async function addStakeholder() {
 }
 
 function contact(s) {
-  if (s.contactType === 'FEISHU' && s.contactId) {
+  if (s.contactType === 'FEISHU' && s.contactId && !String(s.contactId).startsWith('ou_cast_')) {
+    // 飞书官方深链：在飞书客户端/嵌入环境中点击直接唤起与对方的单聊窗口
     window.open(`https://applink.feishu.cn/client/chat/open?openId=${s.contactId}`, '_blank')
+  } else if (s.contactType === 'FEISHU') {
+    ElMessage.info(`${s.name} 暂无飞书身份信息：请让 TA 在本项目群聊里发过消息后，AI 会自动获取真实 ID；或手动编辑干系人填写`)
   } else if (s.contactType === 'WECOM' && s.contactId) {
     window.location.href = `wxwork://message?username=${s.contactId}`
   } else {

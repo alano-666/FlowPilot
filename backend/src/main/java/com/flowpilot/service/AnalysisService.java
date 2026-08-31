@@ -33,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -212,12 +213,13 @@ public class AnalysisService {
         }
 
         // 7. 干系人更新：AI 解析 + 消息内【干系人】标记兜底解析（双路合并，按 节点+角色+姓名 去重）
+        //    并用消息里的真实发送者 open_id 回填联系方式，保证「一键联系」真实可用
         if (!project.isManualLock()) {
             List<AiSchemas.AnalysisResult.StakeholderUpdate> marked = extractMarkedStakeholders(context);
             List<AiSchemas.AnalysisResult.StakeholderUpdate> merged = new ArrayList<>();
             merged.addAll(result.stakeholders_update() == null ? List.of() : result.stakeholders_update());
             merged.addAll(marked);
-            upsertStakeholders(projectId, merged);
+            upsertStakeholders(projectId, merged, buildSenderMap(context));
         }
 
         // 8. 联动通知
@@ -323,13 +325,26 @@ public class AnalysisService {
         return out;
     }
 
-    private void upsertStakeholders(Long projectId, List<AiSchemas.AnalysisResult.StakeholderUpdate> updates) {
+    private void upsertStakeholders(Long projectId, List<AiSchemas.AnalysisResult.StakeholderUpdate> updates,
+                                    Map<String, String> senderMap) {
         if (updates == null) {
             return;
         }
         for (AiSchemas.AnalysisResult.StakeholderUpdate u : updates) {
             if (u.name() == null || u.name().isBlank()) {
                 continue;
+            }
+            // 真实身份回填：消息发送者的真实 open_id 优先于 AI/剧本推测的假 ID
+            String realOpenId = senderMap.get(u.name().trim());
+            if (realOpenId == null) {
+                realOpenId = fuzzyFindSender(senderMap, u.name().trim());
+            }
+            String contactId = u.contact_id();
+            Stakeholder.ContactType contactType = parseContactType(u.contact_type());
+            if (realOpenId != null && !realOpenId.startsWith("ou_cast_")
+                    && (contactId == null || contactId.isBlank() || contactId.startsWith("ou_cast_"))) {
+                contactId = realOpenId;
+                contactType = Stakeholder.ContactType.FEISHU;
             }
             Stakeholder existing = stakeholderRepository.findByProjectIdAndNodeKey(projectId, u.node_key())
                     .stream()
@@ -338,8 +353,8 @@ public class AnalysisService {
                     .findFirst()
                     .orElse(null);
             if (existing != null) {
-                existing.setContactType(parseContactType(u.contact_type()));
-                existing.setContactId(u.contact_id());
+                existing.setContactType(contactType);
+                existing.setContactId(contactId);
                 existing.setUpdatedAt(LocalDateTime.now());
                 stakeholderRepository.save(existing);
                 continue;
@@ -349,13 +364,42 @@ public class AnalysisService {
             s.setNodeKey(u.node_key());
             s.setRole(u.role());
             s.setName(u.name());
-            s.setContactType(parseContactType(u.contact_type()));
-            s.setContactId(u.contact_id());
+            s.setContactType(contactType);
+            s.setContactId(contactId);
             if (s.getContactType() == Stakeholder.ContactType.WECHAT) {
-                s.setWechatId(u.contact_id());
+                s.setWechatId(contactId);
             }
             stakeholderRepository.save(s);
         }
+    }
+
+    /** 从消息构建 姓名→真实飞书 open_id 映射（一键联系的真实性来源；排除剧本假 ID） */
+    public static Map<String, String> buildSenderMap(List<Message> messages) {
+        Map<String, String> map = new LinkedHashMap<>();
+        for (Message m : messages) {
+            if (m.getSenderId() != null && m.getSenderId().startsWith("ou_")
+                    && !m.getSenderId().startsWith("ou_cast_")     // 群演剧本的假 ID 不算真实身份
+                    && m.getSenderName() != null && !m.getSenderName().isBlank()) {
+                map.putIfAbsent(m.getSenderName().trim(), m.getSenderId());
+            }
+        }
+        return map;
+    }
+
+    /**
+     * 模糊匹配：飞书昵称（如「星辰-陈总」「陈总（客户）」）与 AI 识别姓名（「陈总」）
+     * 经常不完全一致，用包含关系兜底匹配。
+     */
+    public static String fuzzyFindSender(Map<String, String> senderMap, String name) {
+        if (name == null || name.length() < 2) {
+            return null;
+        }
+        for (Map.Entry<String, String> e : senderMap.entrySet()) {
+            if (e.getKey().length() >= 2 && (e.getKey().contains(name) || name.contains(e.getKey()))) {
+                return e.getValue();
+            }
+        }
+        return null;
     }
 
     private Stakeholder.ContactType parseContactType(String type) {

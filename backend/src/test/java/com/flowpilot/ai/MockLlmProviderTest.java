@@ -109,4 +109,35 @@ class MockLlmProviderTest {
         assertEquals("m7", PromptBuilder.sliceMessages(messages, 3).get(0).getContent());
         assertEquals(10, PromptBuilder.sliceMessages(messages, 100).size());
     }
+
+    @Test
+    void buildSenderMapExtractsRealOpenIds() {
+        Message m1 = new Message();
+        m1.setSenderId("ou_real_001");
+        m1.setSenderName("陈总");
+        m1.setSentAt(LocalDateTime.now());
+        Message m2 = new Message();
+        m2.setSenderId("ou_cast_wang");   // 剧本假 ID 不进入映射
+        m2.setSenderName("王五");
+        m2.setSentAt(LocalDateTime.now());
+        Message m3 = new Message();
+        m3.setSenderId(null);
+        m3.setSenderName("无身份");
+        m3.setSentAt(LocalDateTime.now());
+        var map = com.flowpilot.service.AnalysisService.buildSenderMap(List.of(m1, m2, m3));
+        assertEquals("ou_real_001", map.get("陈总"));
+        assertNull(map.get("王五"));      // 假 ID 被排除
+        assertNull(map.get("无身份"));    // 无 senderId 不映射
+    }
+
+    @Test
+    void fuzzyFindSenderHandlesNicknameVariations() {
+        var map = java.util.Map.of("星辰-陈总", "ou_real_001", "孙浩(研发)", "ou_real_002");
+        assertEquals("ou_real_001",
+                com.flowpilot.service.AnalysisService.fuzzyFindSender(map, "陈总"));
+        assertEquals("ou_real_002",
+                com.flowpilot.service.AnalysisService.fuzzyFindSender(map, "孙浩"));
+        assertNull(com.flowpilot.service.AnalysisService.fuzzyFindSender(map, "林"));
+        assertNull(com.flowpilot.service.AnalysisService.fuzzyFindSender(map, null));
+    }
 }
