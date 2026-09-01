@@ -14,8 +14,6 @@ const routes = [
       { path: 'templates', name: 'templates', component: () => import('./views/Templates.vue'), meta: { title: '流程模板' } },
       { path: 'templates/:id/edit', name: 'templateEdit', component: () => import('./views/TemplateEdit.vue'), meta: { title: '模板编辑' } },
       { path: 'channels', name: 'channels', component: () => import('./views/Channels.vue'), meta: { title: '数据源管理' } },
-      { path: 'reports', name: 'reports', component: () => import('./views/Reports.vue'), meta: { title: '报告中心' } },
-      { path: 'notifications', name: 'notifications', component: () => import('./views/Notifications.vue'), meta: { title: '通知预警' } },
       { path: 'settings', name: 'settings', component: () => import('./views/Settings.vue'), meta: { title: '系统设置' } }
     ]
   }

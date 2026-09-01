@@ -49,8 +49,6 @@ const navs = [
   { path: '/', icon: '📊', label: '项目看板' },
   { path: '/templates', icon: '📚', label: '流程模板' },
   { path: '/channels', icon: '🔌', label: '数据源管理' },
-  { path: '/reports', icon: '📄', label: '报告中心' },
-  { path: '/notifications', icon: '🔔', label: '通知预警' },
   { path: '/settings', icon: '⚙️', label: '系统设置' }
 ]
 

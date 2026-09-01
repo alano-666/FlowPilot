@@ -11,7 +11,6 @@ import com.flowpilot.repository.MessageRepository;
 import com.flowpilot.repository.ProjectRepository;
 import com.flowpilot.repository.UserRepository;
 import com.flowpilot.service.AnalysisService;
-import com.flowpilot.service.ReportService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
@@ -42,8 +41,6 @@ public class DataSeeder implements ApplicationRunner {
     private final FlowTemplateRepository templateRepository;
     private final ProjectRepository projectRepository;
     private final MessageRepository messageRepository;
-    private final com.flowpilot.repository.NotificationJobRepository notificationJobRepository;
-    private final com.flowpilot.service.ReportService reportService;
     private final MockChannelService mockChannelService;
     private final AnalysisService analysisService;
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
@@ -51,8 +48,6 @@ public class DataSeeder implements ApplicationRunner {
     public DataSeeder(FlowPilotProperties props, UserRepository userRepository,
                       FlowTemplateRepository templateRepository, ProjectRepository projectRepository,
                       MessageRepository messageRepository,
-                      com.flowpilot.repository.NotificationJobRepository notificationJobRepository,
-                      com.flowpilot.service.ReportService reportService,
                       MockChannelService mockChannelService,
                       AnalysisService analysisService) {
         this.props = props;
@@ -60,8 +55,6 @@ public class DataSeeder implements ApplicationRunner {
         this.templateRepository = templateRepository;
         this.projectRepository = projectRepository;
         this.messageRepository = messageRepository;
-        this.notificationJobRepository = notificationJobRepository;
-        this.reportService = reportService;
         this.mockChannelService = mockChannelService;
         this.analysisService = analysisService;
     }
@@ -78,7 +71,6 @@ public class DataSeeder implements ApplicationRunner {
             seedProjectManagementScenario();
             seedRequirementUpdateScenario();
             seedSupportTicketScenario();
-            seedDemoNotificationsAndReport();
             log.info("演示数据就绪：模板 {} 套，项目 {} 个（含模拟群聊与 AI 分析结果）",
                     templateRepository.count(), projectRepository.count());
         } catch (Exception e) {
@@ -86,49 +78,6 @@ public class DataSeeder implements ApplicationRunner {
         }
     }
 
-    /** 演示通知 + 演示周报：让通知/报告中心开箱即有内容可看 */
-    private void seedDemoNotificationsAndReport() {
-        if (notificationJobRepository.count() == 0) {
-            long pid = projectRepository.findByStatus(Project.Status.ACTIVE).stream()
-                    .findFirst().map(Project::getId).orElse(1L);
-            seedNotification(pid, com.flowpilot.model.NotificationJob.Type.RISK_ALERT,
-                    "项目风险预警", "识别到以下风险：\n- 节点「开启远程权限」已超 SLA 3 小时\n- 客户侧联系人两天未回复消息",
-                    "[{\"name\":\"李四\",\"role\":\"我方技术支持\",\"contact_type\":\"feishu\",\"contact_id\":\"ou_lisi\"}]");
-            seedNotification(pid, com.flowpilot.model.NotificationJob.Type.SLA_OVERDUE,
-                    "节点超时预警：「开启远程权限」", "节点「开启远程权限」SLA 要求 2 小时，已超时 3 小时，请及时跟进。",
-                    "[{\"name\":\"张工\",\"role\":\"客户IT\",\"contact_type\":\"wecom\",\"contact_id\":\"zhanggong_it\"}]");
-            seedNotification(pid, com.flowpilot.model.NotificationJob.Type.DAILY_DIGEST,
-                    "每日进度摘要", "今日共 4 个进行中项目，其中 1 个卡顿、3 个预警，点击查看完整看板。", "[]");
-            log.info("演示通知已生成 3 条");
-        }
-        java.nio.file.Path reportDir = java.nio.file.Path.of("./data/reports");
-        try (var stream = java.nio.file.Files.list(reportDir)) {
-            if (stream.findAny().isEmpty()) {
-                ReportService.ReportSummary summary = reportService.buildSummary(
-                        "周报", LocalDateTime.now().minusDays(7), LocalDateTime.now());
-                reportService.generate(summary, reportDir);
-                log.info("演示周报已生成到 data/reports");
-            }
-        } catch (java.nio.file.NoSuchFileException e) {
-            ReportService.ReportSummary summary = reportService.buildSummary(
-                    "周报", LocalDateTime.now().minusDays(7), LocalDateTime.now());
-            reportService.generate(summary, reportDir);
-        } catch (Exception ignored) {
-        }
-    }
-
-    private void seedNotification(Long projectId, com.flowpilot.model.NotificationJob.Type type,
-                                  String title, String content, String targets) {
-        com.flowpilot.model.NotificationJob job = new com.flowpilot.model.NotificationJob();
-        job.setProjectId(projectId);
-        job.setType(type);
-        job.setTitle(title);
-        job.setContent(content);
-        job.setTargetsJson(targets);
-        job.setStatus(com.flowpilot.model.NotificationJob.Status.SENT);
-        job.setExecutedAt(LocalDateTime.now().minusHours(2));
-        notificationJobRepository.save(job);
-    }
 
     private void seedUsers() {
         if (userRepository.findByUsername("admin").isEmpty()) {

@@ -209,12 +209,6 @@ const users = [
   { id: 2, username: 'manager', displayName: '流程负责人', role: 'MANAGER', feishuOpenId: 'ou_demo', wecomUserId: '', phone: '' }
 ]
 
-const reports = [
-  { name: '周报-20260825-080000.xlsx', size: 24576, modifiedAt: ts(48) },
-  { name: '周报-20260825-080000.pdf', size: 184320, modifiedAt: ts(48) },
-  { name: '周报-20260825-080000.html', size: 9216, modifiedAt: ts(48) }
-]
-
 /* ---------- 内存状态与工具 ---------- */
 let nextId = 1000
 const delay = (ms = 150) => new Promise(r => setTimeout(r, ms))
@@ -433,34 +427,6 @@ async function handle(method, url, data, params) {
   }
   if (url.match(/^\/projects\/\d+\/channels\/\d+$/)) return null
 
-  if (url === '/reports') return reports
-  if (url === '/reports/generate') {
-    return {
-      summary: {
-        totalProjects: 4, activeProjects: 4, riskProjectCount: 4, riskRate: 100.0,
-        flowStats: [
-          { flowName: '远程安装设备', projectCount: 1, avgHours: 24.5 },
-          { flowName: '软件项目管理流程', projectCount: 1, avgHours: 60.0 },
-          { flowName: '软件需求更新流程', projectCount: 1, avgHours: 96.0 },
-          { flowName: '客户支持工单流程', projectCount: 1, avgHours: 36.0 }
-        ],
-        bottleneckNodes: [
-          { node: '客户支持工单流程/fix_implement', stuckCount: 1 },
-          { node: '远程安装设备/acceptance', stuckCount: 1 }
-        ],
-        responseStats: []
-      },
-      files: { excel: './data/reports/演示-周报.xlsx', pdf: './data/reports/演示-周报.pdf', html: './data/reports/演示-周报.html' }
-    }
-  }
-  if (url === '/notifications') return page(notifications, params)
-  if (url === '/notifications/digest') return { pushedProjects: 4 }
-  if (url === '/settings') return settings
-  if (url === '/users') return users
-  if (url === '/users' && method === 'post') {
-    users.push({ id: ++nextId, username: data.username, displayName: data.displayName, role: data.role, feishuOpenId: '', wecomUserId: '', phone: '' })
-    return users[users.length - 1]
-  }
 
   console.warn('[演示模式] 未实现的接口:', method, url)
   return null

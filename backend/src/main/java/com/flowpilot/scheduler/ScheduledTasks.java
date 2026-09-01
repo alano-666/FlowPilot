@@ -12,7 +12,6 @@ import com.flowpilot.repository.StakeholderRepository;
 import com.flowpilot.service.AnalysisService;
 import com.flowpilot.service.ChannelSyncService;
 import com.flowpilot.service.NotifyService;
-import com.flowpilot.service.ReportService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -45,7 +44,6 @@ public class ScheduledTasks {
     private final com.flowpilot.channel.EmailChannelService emailChannelService;
     private final AnalysisService analysisService;
     private final NotifyService notifyService;
-    private final ReportService reportService;
     private final ProjectRepository projectRepository;
     private final StakeholderRepository stakeholderRepository;
     private final MessageRepository messageRepository;
@@ -53,14 +51,13 @@ public class ScheduledTasks {
     public ScheduledTasks(FlowPilotProperties props, ChannelSyncService channelSyncService,
                           com.flowpilot.channel.EmailChannelService emailChannelService,
                           AnalysisService analysisService, NotifyService notifyService,
-                          ReportService reportService, ProjectRepository projectRepository,
+ProjectRepository projectRepository,
                           StakeholderRepository stakeholderRepository, MessageRepository messageRepository) {
         this.props = props;
         this.channelSyncService = channelSyncService;
         this.emailChannelService = emailChannelService;
         this.analysisService = analysisService;
         this.notifyService = notifyService;
-        this.reportService = reportService;
         this.projectRepository = projectRepository;
         this.stakeholderRepository = stakeholderRepository;
         this.messageRepository = messageRepository;
@@ -152,39 +149,6 @@ public class ScheduledTasks {
             } catch (Exception e) {
                 log.warn("项目 {} SLA 巡检失败: {}", p.getId(), e.getMessage());
             }
-        }
-    }
-
-    /** 每日进度摘要（PRD 3.8.1） */
-    @Scheduled(cron = "${flowpilot.notify.digest-cron:0 0 9 * * ?}")
-    public void dailyDigest() {
-        List<Project> active = projectRepository.findByStatus(Project.Status.ACTIVE);
-        if (active.isEmpty()) {
-            return;
-        }
-        notifyService.sendDailyDigest(active);
-        log.info("每日进度摘要已推送，{} 个进行中项目", active.size());
-    }
-
-    /** 周报自动生成 */
-    @Scheduled(cron = "${flowpilot.notify.weekly-report-cron:0 0 8 ? * MON}")
-    public void weeklyReport() {
-        generateReport("周报", LocalDateTime.now().minusDays(7), LocalDateTime.now());
-    }
-
-    /** 月报自动生成 */
-    @Scheduled(cron = "${flowpilot.notify.monthly-report-cron:0 0 8 1 * ?}")
-    public void monthlyReport() {
-        generateReport("月报", LocalDateTime.now().minusDays(30), LocalDateTime.now());
-    }
-
-    private void generateReport(String period, LocalDateTime from, LocalDateTime to) {
-        try {
-            ReportService.ReportSummary summary = reportService.buildSummary(period, from, to);
-            reportService.generate(summary, Path.of("./data/reports"));
-            log.info("{}自动生成完成", period);
-        } catch (Exception e) {
-            log.warn("{}自动生成失败: {}", period, e.getMessage());
         }
     }
 

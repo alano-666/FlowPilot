@@ -117,34 +117,4 @@ public class NotifyService {
         log.info("[通知] project={} {} | {}", project.getId(), project.getName(), content);
     }
 
-    /** 每日进度摘要（PRD 3.8.1 示例） */
-    public void sendDailyDigest(List<Project> activeProjects) {
-        StringBuilder sb = new StringBuilder("【FlowPilot 每日进度】\n今日共 ")
-                .append(activeProjects.size()).append(" 个进行中项目\n");
-        int i = 1;
-        for (Project p : activeProjects) {
-            sb.append(i++).append(". ").append(p.getCustomerName() == null ? p.getName() : p.getCustomerName())
-                    .append(" - ").append(p.getTemplateName() == null ? "未绑定模板" : p.getTemplateName())
-                    .append(" - ").append(Math.round(p.getProgress() * 100)).append("%")
-                    .append(" - 当前节点：").append(p.getCurrentNodeKey() == null ? "待启动" : p.getCurrentNodeKey());
-            if (p.getRiskStatus() != Project.RiskStatus.NORMAL) {
-                sb.append(" - ⚠️").append(p.getRiskStatus() == Project.RiskStatus.BLOCKED ? "已卡顿" : "预警");
-            }
-            sb.append('\n');
-        }
-        sb.append("点击查看完整看板");
-        String fsWebhook = props.getNotify().getFeishuWebhook();
-        String wcWebhook = props.getNotify().getWecomWebhook();
-        try {
-            if (fsWebhook != null && !fsWebhook.isBlank()) {
-                feishuClient.sendWebhook(fsWebhook, sb.toString());
-            } else if (wcWebhook != null && !wcWebhook.isBlank()) {
-                weComClient.sendWebhook(wcWebhook, sb.toString());
-            } else {
-                log.info("[每日摘要]\n{}", sb);
-            }
-        } catch (Exception e) {
-            log.warn("每日摘要推送失败: {}", e.getMessage());
-        }
-    }
 }

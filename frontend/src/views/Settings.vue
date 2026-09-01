@@ -13,7 +13,6 @@
           <el-descriptions-item label="Anthropic 模型">{{ settings.ai?.anthropicModel }}</el-descriptions-item>
           <el-descriptions-item label="OpenAI 兼容模型">{{ settings.ai?.openaiModel }}</el-descriptions-item>
           <el-descriptions-item label="分析并发数">{{ settings.ai?.parallelism }}</el-descriptions-item>
-          <el-descriptions-item label="每日摘要时间">{{ settings.notify?.digestCron }}</el-descriptions-item>
           <el-descriptions-item label="渠道同步频率">{{ settings.notify?.syncCron }}</el-descriptions-item>
           <el-descriptions-item label="微信监控目录">{{ settings.wechat?.watchDir }}
             <span class="muted small">（{{ settings.wechat?.watchEnabled ? '监控中' : '已停用' }}）</span>

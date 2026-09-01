@@ -34,7 +34,6 @@ public class SettingsController {
                         "anthropicModel", props.getAi().getAnthropic().getModel(),
                         "openaiModel", props.getAi().getOpenai().getModel()),
                 "notify", Map.of(
-                        "digestCron", props.getNotify().getDigestCron(),
                         "syncCron", props.getNotify().getSyncCron(),
                         "slaCheckCron", props.getNotify().getSlaCheckCron(),
                         "feishuWebhookConfigured", !props.getNotify().getFeishuWebhook().isBlank(),
