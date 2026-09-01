@@ -335,6 +335,13 @@ async function handle(method, url, data, params) {
       return p
     }
   }
+  const projectDeleteMatch = url.match(/^\/projects\/(\d+)$/)
+  if (projectDeleteMatch && method === 'delete') {
+    const id = Number(projectDeleteMatch[1])
+    const idx = projects.findIndex(p => p.id === id)
+    if (idx >= 0) projects.splice(idx, 1)
+    return null
+  }
 
   if (url === '/templates') {
     let list = [...templates]

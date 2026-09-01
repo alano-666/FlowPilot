@@ -15,4 +15,6 @@ public interface NotificationJobRepository extends JpaRepository<NotificationJob
     List<NotificationJob> findByStatus(NotificationJob.Status status);
 
     List<NotificationJob> findByProjectIdOrderByCreatedAtDesc(Long projectId);
+    void deleteByProjectId(Long projectId);
+
 }

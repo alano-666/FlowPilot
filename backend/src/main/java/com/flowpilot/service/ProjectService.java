@@ -35,12 +35,36 @@ public class ProjectService {
     private final ProjectRepository projectRepository;
     private final FlowTemplateRepository templateRepository;
     private final ProjectChannelRepository channelRepository;
+    private final com.flowpilot.repository.StakeholderRepository stakeholderRepository;
+    private final com.flowpilot.repository.MessageRepository messageRepository;
+    private final com.flowpilot.repository.AnalysisRunRepository analysisRunRepository;
+    private final com.flowpilot.repository.AiInsightRepository insightRepository;
+    private final com.flowpilot.repository.CalibrationLogRepository calibrationLogRepository;
+    private final com.flowpilot.repository.PendingSuggestionRepository suggestionRepository;
+    private final com.flowpilot.repository.NotificationJobRepository notificationJobRepository;
+    private final com.flowpilot.repository.ImportRecordRepository importRecordRepository;
 
     public ProjectService(ProjectRepository projectRepository, FlowTemplateRepository templateRepository,
-                          ProjectChannelRepository channelRepository) {
+                          ProjectChannelRepository channelRepository,
+                          com.flowpilot.repository.StakeholderRepository stakeholderRepository,
+                          com.flowpilot.repository.MessageRepository messageRepository,
+                          com.flowpilot.repository.AnalysisRunRepository analysisRunRepository,
+                          com.flowpilot.repository.AiInsightRepository insightRepository,
+                          com.flowpilot.repository.CalibrationLogRepository calibrationLogRepository,
+                          com.flowpilot.repository.PendingSuggestionRepository suggestionRepository,
+                          com.flowpilot.repository.NotificationJobRepository notificationJobRepository,
+                          com.flowpilot.repository.ImportRecordRepository importRecordRepository) {
         this.projectRepository = projectRepository;
         this.templateRepository = templateRepository;
         this.channelRepository = channelRepository;
+        this.stakeholderRepository = stakeholderRepository;
+        this.messageRepository = messageRepository;
+        this.analysisRunRepository = analysisRunRepository;
+        this.insightRepository = insightRepository;
+        this.calibrationLogRepository = calibrationLogRepository;
+        this.suggestionRepository = suggestionRepository;
+        this.notificationJobRepository = notificationJobRepository;
+        this.importRecordRepository = importRecordRepository;
     }
 
     public record CreateRequest(String name, Long templateId, String customerName,
@@ -162,6 +186,26 @@ public class ProjectService {
         }
         p.setUpdatedAt(LocalDateTime.now());
         return projectRepository.save(p);
+    }
+
+    /**
+     * 删除项目（级联清理全部关联数据）：
+     * 渠道绑定、干系人、消息、分析记录、证据、校准日志、AI 建议、通知、导入记录。
+     * 建议优先使用「归档」保留历史；此操作用于清理测试数据，不可恢复。
+     */
+    @Transactional
+    public void deleteProject(Long id) {
+        get(id);
+        channelRepository.deleteByProjectId(id);
+        stakeholderRepository.deleteByProjectId(id);
+        messageRepository.deleteByProjectId(id);
+        analysisRunRepository.deleteByProjectId(id);
+        insightRepository.deleteByProjectId(id);
+        calibrationLogRepository.deleteByProjectId(id);
+        suggestionRepository.deleteByProjectId(id);
+        notificationJobRepository.deleteByProjectId(id);
+        importRecordRepository.deleteByProjectId(id);
+        projectRepository.deleteById(id);
     }
 
     // ---------- 渠道绑定 ----------

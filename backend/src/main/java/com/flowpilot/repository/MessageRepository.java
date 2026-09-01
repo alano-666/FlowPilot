@@ -23,4 +23,6 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
 
     /** 数据留存清理：删除指定时间之前的原始消息 */
     long deleteBySentAtBefore(LocalDateTime before);
+    void deleteByProjectId(Long projectId);
+
 }

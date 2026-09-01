@@ -9,4 +9,6 @@ public interface AiInsightRepository extends JpaRepository<AiInsight, Long> {
     List<AiInsight> findByProjectIdOrderByCreatedAtDesc(Long projectId);
 
     List<AiInsight> findByRunId(Long runId);
+    void deleteByProjectId(Long projectId);
+
 }

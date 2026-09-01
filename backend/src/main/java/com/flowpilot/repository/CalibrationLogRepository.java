@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface CalibrationLogRepository extends JpaRepository<CalibrationLog, Long> {
     List<CalibrationLog> findByProjectIdOrderByCreatedAtDesc(Long projectId);
+    void deleteByProjectId(Long projectId);
+
 }

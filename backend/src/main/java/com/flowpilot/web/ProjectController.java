@@ -108,6 +108,14 @@ public class ProjectController {
         return ApiResponse.ok(projectService.changeStatus(id, req.status()));
     }
 
+    /** 删除项目（级联清理全部关联数据，不可恢复；建议优先用归档） */
+    @RequireRole(User.Role.MANAGER)
+    @DeleteMapping("/{id}")
+    public ApiResponse<Void> deleteProject(@PathVariable Long id) {
+        projectService.deleteProject(id);
+        return ApiResponse.ok();
+    }
+
     public record BasicUpdateRequest(String name, String customerName, Long ownerId) {
     }
 

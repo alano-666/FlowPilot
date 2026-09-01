@@ -41,7 +41,7 @@ public class ProjectChannel {
     private String channelId;
 
     /** 飞书组织租户代码（多租户支持；default=主组织，其余见 flowpilot.feishu.tenants） */
-    @Column(nullable = false, length = 32)
+    @Column(nullable = false, length = 32, columnDefinition = "VARCHAR(32) DEFAULT 'default'")
     private String tenantCode = "default";
 
     @Column(length = 128)

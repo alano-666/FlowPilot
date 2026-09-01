@@ -56,9 +56,9 @@
       </div>
     </div>
 
-    <!-- 项目卡片网格 -->
+    <!-- 项目卡片网格（悬停右上角显示 🗑 删除键） -->
     <div v-if="projects.length" class="project-grid">
-      <ProjectCard v-for="p in projects" :key="p.id" :project="p" />
+      <ProjectCard v-for="p in projects" :key="p.id" :project="p" @delete="removeProject" />
     </div>
     <el-empty v-else description="暂无项目，点击右上角新建" />
 
@@ -91,7 +91,7 @@
 
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import api from '../api'
 import ProjectCard from '../components/ProjectCard.vue'
 
@@ -127,6 +127,18 @@ async function refresh() {
   } catch (e) { /* 提示已由拦截器处理 */ }
   await load()
   syncing.value = false
+}
+
+/** 卡片删除键：确认后级联删除（不可恢复） */
+async function removeProject(project) {
+  try {
+    await ElMessageBox.confirm(
+      `确定删除项目「${project.name}」吗？将级联删除其全部渠道、消息、分析记录与校准日志，不可恢复。\n建议仅用于清理测试数据，正式项目请用「归档」。`,
+      '删除项目', { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' })
+  } catch { return }
+  await api.delete(`/projects/${project.id}`)
+  ElMessage.success('项目已删除')
+  load()
 }
 
 async function openCreate() {

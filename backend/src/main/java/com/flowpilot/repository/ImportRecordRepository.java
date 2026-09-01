@@ -9,4 +9,6 @@ public interface ImportRecordRepository extends JpaRepository<ImportRecord, Long
     Page<ImportRecord> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
     Page<ImportRecord> findByProjectIdOrderByCreatedAtDesc(Long projectId, Pageable pageable);
+    void deleteByProjectId(Long projectId);
+
 }

@@ -16,4 +16,6 @@ public interface ProjectChannelRepository extends JpaRepository<ProjectChannel, 
             Long projectId, ProjectChannel.ChannelType channelType, String channelId);
 
     List<ProjectChannel> findByChannelTypeAndSyncEnabledTrue(ProjectChannel.ChannelType channelType);
+    void deleteByProjectId(Long projectId);
+
 }

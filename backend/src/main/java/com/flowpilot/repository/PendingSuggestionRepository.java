@@ -10,4 +10,6 @@ public interface PendingSuggestionRepository extends JpaRepository<PendingSugges
             Long projectId, PendingSuggestion.Status status);
 
     List<PendingSuggestion> findByStatus(PendingSuggestion.Status status);
+    void deleteByProjectId(Long projectId);
+
 }

@@ -1,34 +1,49 @@
 <template>
-  <router-link class="project-card" :to="`/projects/${project.id}`">
-    <div class="pc-top">
-      <div>
-        <div class="pc-title">{{ project.name }}</div>
-        <div class="pc-sub">
-          <span v-if="project.customerName">客户：{{ project.customerName }} · </span>
-          <span>流程：{{ project.templateName || '未绑定' }}</span>
+  <div class="project-card-wrap">
+    <router-link class="project-card" :to="`/projects/${project.id}`">
+      <div class="pc-top">
+        <div>
+          <div class="pc-title">{{ project.name }}</div>
+          <div class="pc-sub">
+            <span v-if="project.customerName">客户：{{ project.customerName }} · </span>
+            <span>流程：{{ project.templateName || '未绑定' }}</span>
+          </div>
         </div>
+        <RiskTag :status="project.riskStatus" />
       </div>
-      <RiskTag :status="project.riskStatus" />
-    </div>
 
-    <div class="fp-progress">
-      <div class="track">
-        <div class="bar" :style="{ width: (project.progress * 100).toFixed(0) + '%' }"></div>
+      <div class="fp-progress">
+        <div class="track">
+          <div class="bar" :style="{ width: (project.progress * 100).toFixed(0) + '%' }"></div>
+        </div>
+        <span class="pct">{{ Math.round(project.progress * 100) }}%</span>
       </div>
-      <span class="pct">{{ Math.round(project.progress * 100) }}%</span>
-    </div>
 
-    <div class="pc-activity" v-if="project.latestActivity">
-      💬 {{ project.latestActivity }}
-    </div>
-    <div class="pc-activity muted" v-else>暂无动态，等待消息同步或导入</div>
+      <div class="pc-activity" v-if="project.latestActivity">
+        💬 {{ project.latestActivity }}
+      </div>
+      <div class="pc-activity muted" v-else>暂无动态，等待消息同步或导入</div>
 
-    <div class="small muted flex-between">
-      <span>当前节点：{{ project.currentNodeKey || '待启动' }}</span>
-      <span class="mono">更新于 {{ fmtTime(project.updatedAt) }}</span>
-    </div>
-  </router-link>
+      <div class="small muted flex-between">
+        <span>当前节点：{{ project.currentNodeKey || '待启动' }}</span>
+        <span class="mono">更新于 {{ fmtTime(project.updatedAt) }}</span>
+      </div>
+    </router-link>
+    <el-button class="pc-delete" size="small" type="danger" circle
+               title="删除项目（级联清理全部数据，不可恢复）"
+               @click.stop="$emit('delete', project)">🗑</el-button>
+  </div>
 </template>
+
+<style scoped>
+.project-card-wrap { position: relative; }
+.pc-delete {
+  position: absolute; top: 10px; right: 10px;
+  opacity: 0; transition: opacity .15s;
+  z-index: 2;
+}
+.project-card-wrap:hover .pc-delete { opacity: 1; }
+</style>
 
 <script setup>
 import RiskTag from './RiskTag.vue'
