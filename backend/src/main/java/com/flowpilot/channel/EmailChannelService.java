@@ -75,6 +75,18 @@ public class EmailChannelService {
             Session session = Session.getInstance(p);
             store = session.getStore("imaps");
             store.connect(cfg.getImapHost(), cfg.getImapPort(), cfg.getUsername(), cfg.getPassword());
+            // 网易(163/126/188)对未声明身份的客户端触发 Unsafe Login 风控：
+            // 登录后立即发送 IMAP ID 命令声明客户端身份（反射调用，兼容 com.sun.mail 与 angus 实现）
+            try {
+                java.lang.reflect.Method idMethod = store.getClass().getMethod("id", java.util.Map.class);
+                idMethod.invoke(store, java.util.Map.of(
+                        "name", "FlowPilot",
+                        "version", "1.0",
+                        "vendor", "flowpilot",
+                        "support-email", cfg.getUsername()));
+            } catch (Exception idEx) {
+                log.debug("IMAP ID 声明失败（不影响后续）: {}", idEx.getMessage());
+            }
 
             Folder folder = store.getFolder(cfg.getFolder());
             folder.open(Folder.READ_ONLY);
