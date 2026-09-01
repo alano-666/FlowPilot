@@ -17,8 +17,6 @@ public class ProjectChannel {
     public enum ChannelType {
         /** 飞书群聊 */
         FEISHU,
-        /** 企业微信群聊 */
-        WECOM,
         /** 微信个人版导入（文件/截图） */
         WECHAT_IMPORT,
         /** 演示渠道（无凭证联调用） */

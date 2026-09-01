@@ -167,7 +167,6 @@
         <el-form-item label="平台">
           <el-select v-model="stakeForm.contactType" style="width:100%">
             <el-option label="飞书" value="FEISHU" />
-            <el-option label="企业微信" value="WECOM" />
             <el-option label="微信个人" value="WECHAT" />
           </el-select>
         </el-form-item>
@@ -289,21 +288,21 @@ function contact(s) {
     window.open(`https://applink.feishu.cn/client/chat/open?openId=${s.contactId}`, '_blank')
   } else if (s.contactType === 'FEISHU') {
     ElMessage.info(`${s.name} 暂无飞书身份信息：请让 TA 在本项目群聊里发过消息后，AI 会自动获取真实 ID；或手动编辑干系人填写`)
-  } else if (s.contactType === 'WECOM' && s.contactId) {
-    window.location.href = `wxwork://message?username=${s.contactId}`
+  } else if (s.contactType === 'WECOM') {
+    ElMessage.info(`微信用户 ${s.name}：请通过微信客户端搜索微信号 ${s.wechatId || s.contactId || '—'} 发起沟通`)
   } else {
     ElMessage.info(`微信用户 ${s.name}：请通过微信客户端搜索微信号 ${s.wechatId || s.contactId || '—'} 发起沟通`)
   }
 }
 
 function contactLabel(s) {
-  return { FEISHU: '飞书', WECOM: '企业微信', WECHAT: '微信' }[s.contactType] || '未知'
+  return { FEISHU: '飞书', WECOM: '微信', WECHAT: '微信' }[s.contactType] || '未知'
 }
 function contactTag(s) {
-  return { FEISHU: 'primary', WECOM: 'success', WECHAT: 'info' }[s.contactType] || 'info'
+  return { FEISHU: 'primary', WECOM: 'info', WECHAT: 'info' }[s.contactType] || 'info'
 }
 function channelLabel(t) {
-  return { FEISHU: '飞书', WECOM: '企微', WECHAT_IMPORT: '微信导入', EMAIL: '邮件', MOCK: '演示' }[t] || t
+  return { FEISHU: '飞书', WECHAT_IMPORT: '微信导入', EMAIL: '邮件', MOCK: '演示' }[t] || t
 }
 function fmt(t) {
   return t ? String(t).replace('T', ' ').slice(0, 16) : '—'

@@ -104,7 +104,7 @@
         <div class="gap8" style="flex-wrap:wrap;margin-bottom:14px">
           <template v-for="c in boundChannels" :key="c.id">
             <el-tag size="large" closable
-                    :type="c.channelType === 'FEISHU' ? 'primary' : c.channelType === 'WECOM' ? 'success' : 'info'"
+                    :type="c.channelType === 'FEISHU' ? 'primary' : 'info'"
                     @close="unbind(c)">
               {{ channelTypeLabel(c.channelType) }}：{{ c.channelName || c.channelId }}
               <span v-if="c.channelType === 'FEISHU' && c.tenantCode && c.tenantCode !== 'default'" class="muted small">（组织:{{ c.tenantCode }}）</span>
@@ -119,7 +119,6 @@
         <div class="gap8" style="flex-wrap:wrap">
           <el-select v-model="bindType" style="width:140px">
             <el-option label="🕊️ 飞书群" value="FEISHU" />
-            <el-option label="💼 企微群" value="WECOM" />
           </el-select>
           <template v-if="bindType === 'FEISHU'">
             <!-- 飞书组织（多租户）：先选组织，再选该组织机器人所在的群 -->
@@ -133,13 +132,11 @@
             </el-select>
             <el-input v-model="bindChannelId" placeholder="或手动粘贴 chat_id" style="width:200px" clearable />
           </template>
-          <el-input v-else v-model="bindChannelId" placeholder="企微群 ID（可从企微管理后台群详情获取）" style="width:340px" />
           <el-button type="primary" :loading="binding" @click="bindChannel">＋ 绑定渠道</el-button>
           <el-button size="small" text type="info" @click="loadFeishuChats" v-if="bindType === 'FEISHU'">刷新群列表</el-button>
         </div>
         <div class="small muted" style="margin-top:10px;line-height:1.8">
           💡 多渠道说明：飞书群可绑 <b>多个</b>（每个群的消息都会同步并参与 AI 分析）；
-          企微群可绑多个（@机器人消息实时入库，全量消息见 docs/企业微信接入说明）；
           微信导入文件与邮箱邮件<b>按项目名/客户名自动匹配归属</b>，无需手动绑定。
         </div>
       </template>
@@ -271,10 +268,10 @@ async function unbind(c) {
 }
 
 function channelTypeLabel(t) {
-  return { FEISHU: '🕊️ 飞书群', WECOM: '💼 企微群', WECHAT_IMPORT: '💬 微信导入', MOCK: '🎭 演示' }[t] || t
+  return { FEISHU: '🕊️ 飞书群', WECHAT_IMPORT: '💬 微信导入', MOCK: '🎭 演示' }[t] || t
 }
 function channelLabel(k) {
-  return { feishu: '🕊️ 飞书', wecom: '💼 企业微信', wechat: '💬 微信个人版', email: '📧 邮件', mock: '🎭 演示渠道' }[k] || k
+  return { feishu: '🕊️ 飞书', wechat: '💬 微信个人版', email: '📧 邮件', mock: '🎭 演示渠道' }[k] || k
 }
 function fmt(t) { return t ? String(t).replace('T', ' ').slice(0, 16) : '—' }
 

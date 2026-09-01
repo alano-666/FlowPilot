@@ -117,10 +117,10 @@ const filters = reactive({ keyword: '', status: '', riskStatus: '' })
 const channelStatus = ref({})
 
 function channelIcon(k) {
-  return { feishu: '🕊️', wecom: '💼', wechat: '💬', email: '📧', mock: '🎭' }[k] || '🔌'
+  return { feishu: '🕊️', wechat: '💬', email: '📧', mock: '🎭' }[k] || '🔌'
 }
 function channelName(k) {
-  return { feishu: '飞书', wecom: '企业微信', wechat: '微信导入', email: '邮件', mock: '演示' }[k] || k
+  return { feishu: '飞书', wechat: '微信导入', email: '邮件', mock: '演示' }[k] || k
 }
 
 const createVisible = ref(false)

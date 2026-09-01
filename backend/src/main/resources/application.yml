@@ -77,12 +77,6 @@ flowpilot:
       #   app-secret: 对方组织的secret
       #   encrypt-key: ""
       #   verification-token: ""
-  wecom:
-    corp-id: ${FLOWPILOT_WECOM_CORPID:}
-    corp-secret: ${FLOWPILOT_WECOM_CORPSECRET:}
-    agent-id: ${FLOWPILOT_WECOM_AGENTID:}
-    encoding-aes-key: ${FLOWPILOT_WECOM_ENCODINGAESKEY:}
-    token: ${FLOWPILOT_WECOM_TOKEN:}
   wechat:
     watch-dir: ${FLOWPILOT_WECHAT_WATCHDIR:./data/watch}
     watch-enabled: ${FLOWPILOT_WECHAT_WATCHENABLED:true}
@@ -107,6 +101,5 @@ flowpilot:
     weekly-report-cron: "0 0 8 ? * MON"
     monthly-report-cron: "0 0 8 1 * ?"
     feishu-webhook: ${FLOWPILOT_NOTIFY_FEISHUWEBHOOK:}
-    wecom-webhook: ${FLOWPILOT_NOTIFY_WECOMWEBHOOK:}
   data:
     retention-days: 90

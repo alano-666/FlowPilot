@@ -36,8 +36,7 @@ public class SettingsController {
                 "notify", Map.of(
                         "syncCron", props.getNotify().getSyncCron(),
                         "slaCheckCron", props.getNotify().getSlaCheckCron(),
-                        "feishuWebhookConfigured", !props.getNotify().getFeishuWebhook().isBlank(),
-                        "wecomWebhookConfigured", !props.getNotify().getWecomWebhook().isBlank()),
+                        "feishuWebhookConfigured", !props.getNotify().getFeishuWebhook().isBlank()),
                 "wechat", Map.of(
                         "watchDir", props.getWechat().getWatchDir(),
                         "watchEnabled", props.getWechat().isWatchEnabled(),

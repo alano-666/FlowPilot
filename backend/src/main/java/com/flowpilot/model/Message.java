@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
 })
 public class Message {
 
-    public enum ChannelType { FEISHU, WECOM, WECHAT_IMPORT, EMAIL, MOCK }
+    public enum ChannelType { FEISHU, WECHAT_IMPORT, EMAIL, MOCK }
 
     public enum MsgType { TEXT, IMAGE, FILE }
 

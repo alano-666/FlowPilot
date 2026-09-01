@@ -2,7 +2,6 @@ package com.flowpilot.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flowpilot.channel.FeishuClient;
-import com.flowpilot.channel.WeComClient;
 import com.flowpilot.config.FlowPilotProperties;
 import com.flowpilot.model.NotificationJob;
 import com.flowpilot.model.Project;
@@ -34,17 +33,15 @@ public class NotifyService {
     private final ProjectChannelRepository channelRepository;
     private final StakeholderRepository stakeholderRepository;
     private final FeishuClient feishuClient;
-    private final WeComClient weComClient;
     private final FlowPilotProperties props;
 
     public NotifyService(NotificationJobRepository jobRepository, ProjectChannelRepository channelRepository,
                          StakeholderRepository stakeholderRepository, FeishuClient feishuClient,
-                         WeComClient weComClient, FlowPilotProperties props) {
+                         FlowPilotProperties props) {
         this.jobRepository = jobRepository;
         this.channelRepository = channelRepository;
         this.stakeholderRepository = stakeholderRepository;
         this.feishuClient = feishuClient;
-        this.weComClient = weComClient;
         this.props = props;
     }
 
@@ -84,7 +81,6 @@ public class NotifyService {
     private void deliver(Project project, String content, List<Stakeholder> targets) {
         String full = "【FlowPilot】" + project.getName() + "\n" + content;
         String fsWebhook = props.getNotify().getFeishuWebhook();
-        String wcWebhook = props.getNotify().getWecomWebhook();
 
         // 优先发项目绑定的飞书群（带@责任人）
         List<ProjectChannel> feishuChannels = channelRepository.findByProjectId(project.getId()).stream()
@@ -108,10 +104,6 @@ public class NotifyService {
         }
         if (fsWebhook != null && !fsWebhook.isBlank()) {
             feishuClient.sendWebhook(fsWebhook, full);
-            return;
-        }
-        if (wcWebhook != null && !wcWebhook.isBlank()) {
-            weComClient.sendWebhook(wcWebhook, full);
             return;
         }
         log.info("[通知] project={} {} | {}", project.getId(), project.getName(), content);

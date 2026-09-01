@@ -271,7 +271,7 @@ public class ProjectService {
         try {
             return ProjectChannel.ChannelType.valueOf(s.toUpperCase());
         } catch (Exception e) {
-            throw new BizException(40006, "未知渠道类型: " + s + "（可选 FEISHU/WECOM/WECHAT_IMPORT/MOCK）");
+            throw new BizException(40006, "未知渠道类型: " + s + "（可选 FEISHU/WECHAT_IMPORT/MOCK）");
         }
     }
 

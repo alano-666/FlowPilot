@@ -125,12 +125,12 @@ const projects = [
 ]
 
 const stakeholders = [
-  { id: 1, projectId: 1, nodeKey: 'acceptance', role: '客户IT', name: '张工', contactType: 'WECOM', contactId: 'zhanggong_it', wechatId: null, avatarUrl: null, updatedAt: ts(2) },
+  { id: 1, projectId: 1, nodeKey: 'acceptance', role: '客户IT', name: '张工', contactType: 'WECHAT', contactId: 'zhanggong_it', wechatId: null, avatarUrl: null, updatedAt: ts(2) },
   { id: 2, projectId: 1, nodeKey: 'acceptance', role: '我方技术支持', name: '李四', contactType: 'FEISHU', contactId: 'ou_lisi', wechatId: null, avatarUrl: null, updatedAt: ts(2) },
   { id: 3, projectId: 1, nodeKey: 'acceptance', role: '销售', name: '王五', contactType: 'WECHAT', contactId: 'wangwu_sales', wechatId: 'wangwu_sales', avatarUrl: null, updatedAt: ts(2) },
   { id: 4, projectId: 2, nodeKey: 'development', role: '研发团队', name: '陈工', contactType: 'FEISHU', contactId: 'ou_chen', wechatId: null, avatarUrl: null, updatedAt: ts(3) },
   { id: 5, projectId: 3, nodeKey: 'customer_acceptance', role: '产品经理', name: '赵敏', contactType: 'FEISHU', contactId: 'ou_zhaomin', wechatId: null, avatarUrl: null, updatedAt: ts(4) },
-  { id: 6, projectId: 4, nodeKey: 'fix_implement', role: '技术支持', name: '刘工', contactType: 'WECOM', contactId: 'liugong', wechatId: null, avatarUrl: null, updatedAt: ts(5) }
+  { id: 6, projectId: 4, nodeKey: 'fix_implement', role: '技术支持', name: '刘工', contactType: 'WECHAT', contactId: 'liugong', wechatId: null, avatarUrl: null, updatedAt: ts(5) }
 ]
 
 const analyses = [
@@ -186,7 +186,6 @@ const notifications = [
 
 const channelStatus = {
   feishu: { configured: false, appId: '', supported: true, note: '群消息自动同步 + 事件回调 + 一键深链沟通' },
-  wecom: { configured: false, corpId: '', supported: true, note: '回调 + 群机器人推送；全量群消息需官方会话存档 SDK' },
   wechat: { configured: true, watchDir: './data/watch', watchEnabled: true, ocr: 'disabled', note: '个人微信无官方 API：文件夹监控自动导入 + 截图 OCR' },
   email: { configured: false, username: '', supported: true, note: 'IMAP 定时拉取项目相关邮件，作为 AI 分析数据源' },
   mock: { configured: true, note: '演示渠道：无凭证生成仿真群聊' }
@@ -198,7 +197,7 @@ const importRecords = [
 
 const settings = {
   ai: { provider: 'anthropic', activeProvider: 'anthropic', parallelism: 8, anthropicModel: 'deepseek-v4-pro', openaiModel: 'gpt-4o-mini' },
-  notify: { digestCron: '0 0 9 * * ?', syncCron: '0 */30 * * * ?', slaCheckCron: '0 5 * * * ?', feishuWebhookConfigured: false, wecomWebhookConfigured: false },
+  notify: { digestCron: '0 0 9 * * ?', syncCron: '0 */30 * * * ?', slaCheckCron: '0 5 * * * ?', feishuWebhookConfigured: false },
   wechat: { watchDir: './data/watch', watchEnabled: true, ocrProvider: 'disabled' },
   data: { retentionDays: 90 },
   version: '1.0.0'

@@ -3,7 +3,6 @@ package com.flowpilot.web;
 import com.flowpilot.auth.RequireRole;
 import com.flowpilot.channel.FeishuClient;
 import com.flowpilot.channel.MockChannelService;
-import com.flowpilot.channel.WeComClient;
 import com.flowpilot.common.ApiResponse;
 import com.flowpilot.common.BizException;
 import com.flowpilot.config.FlowPilotProperties;
@@ -22,17 +21,15 @@ import java.util.Map;
 public class ChannelController {
 
     private final FeishuClient feishuClient;
-    private final WeComClient weComClient;
     private final ChannelSyncService channelSyncService;
     private final com.flowpilot.channel.EmailChannelService emailChannelService;
     private final FlowPilotProperties props;
 
-    public ChannelController(FeishuClient feishuClient, WeComClient weComClient,
+    public ChannelController(FeishuClient feishuClient,
                              ChannelSyncService channelSyncService,
                              com.flowpilot.channel.EmailChannelService emailChannelService,
                              FlowPilotProperties props) {
         this.feishuClient = feishuClient;
-        this.weComClient = weComClient;
         this.channelSyncService = channelSyncService;
         this.emailChannelService = emailChannelService;
         this.props = props;
@@ -47,11 +44,6 @@ public class ChannelController {
                         "appId", mask(props.getFeishu().getAppId()),
                         "supported", true,
                         "note", "群消息自动同步 + 事件回调 + 一键深链沟通"),
-                "wecom", Map.of(
-                        "configured", weComClient.configured(),
-                        "corpId", mask(props.getWecom().getCorpId()),
-                        "supported", true,
-                        "note", "回调 + 群机器人推送；全量群消息需官方会话存档 SDK（见 docs/07）"),
                 "wechat", Map.of(
                         "configured", true,
                         "supported", true,

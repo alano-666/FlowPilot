@@ -21,9 +21,6 @@ public class FlowPilotProperties {
     /** 飞书开放平台配置 */
     private final Feishu feishu = new Feishu();
 
-    /** 企业微信配置 */
-    private final WeCom wecom = new WeCom();
-
     /** 微信个人版导入配置 */
     private final WeChat wechat = new WeChat();
 
@@ -42,7 +39,6 @@ public class FlowPilotProperties {
     public Ai getAi() { return ai; }
     public Auth getAuth() { return auth; }
     public Feishu getFeishu() { return feishu; }
-    public WeCom getWecom() { return wecom; }
     public WeChat getWechat() { return wechat; }
     public Email getEmail() { return email; }
     public Notify getNotify() { return notify; }
@@ -169,26 +165,6 @@ public class FlowPilotProperties {
         public void setVerificationToken(String verificationToken) { this.verificationToken = verificationToken; }
     }
 
-    public static class WeCom {
-        private String corpId = "";
-        private String corpSecret = "";
-        private String agentId = "";
-        /** 回调消息加密 Key（Base64 编码） */
-        private String encodingAesKey = "";
-        private String token = "";
-
-        public String getCorpId() { return corpId; }
-        public void setCorpId(String corpId) { this.corpId = corpId; }
-        public String getCorpSecret() { return corpSecret; }
-        public void setCorpSecret(String corpSecret) { this.corpSecret = corpSecret; }
-        public String getAgentId() { return agentId; }
-        public void setAgentId(String agentId) { this.agentId = agentId; }
-        public String getEncodingAesKey() { return encodingAesKey; }
-        public void setEncodingAesKey(String encodingAesKey) { this.encodingAesKey = encodingAesKey; }
-        public String getToken() { return token; }
-        public void setToken(String token) { this.token = token; }
-    }
-
     public static class WeChat {
         /** 导入文件夹监控目录（自动导入） */
         private String watchDir = "./data/watch";
@@ -273,9 +249,6 @@ public class FlowPilotProperties {
         private String monthlyReportCron = "0 0 8 1 * ?";
         /** 飞书群机器人 webhook（通知推送目标，可空） */
         private String feishuWebhook = "";
-        /** 企微群机器人 webhook（通知推送目标，可空） */
-        private String wecomWebhook = "";
-
         public String getDigestCron() { return digestCron; }
         public void setDigestCron(String digestCron) { this.digestCron = digestCron; }
         public String getSyncCron() { return syncCron; }
@@ -288,8 +261,6 @@ public class FlowPilotProperties {
         public void setMonthlyReportCron(String monthlyReportCron) { this.monthlyReportCron = monthlyReportCron; }
         public String getFeishuWebhook() { return feishuWebhook; }
         public void setFeishuWebhook(String feishuWebhook) { this.feishuWebhook = feishuWebhook; }
-        public String getWecomWebhook() { return wecomWebhook; }
-        public void setWecomWebhook(String wecomWebhook) { this.wecomWebhook = wecomWebhook; }
     }
 
     public static class Data {

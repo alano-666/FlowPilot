@@ -3,7 +3,6 @@ package com.flowpilot.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flowpilot.channel.FeishuClient;
-import com.flowpilot.channel.WeComClient;
 import com.flowpilot.model.Message;
 import com.flowpilot.model.ProjectChannel;
 import com.flowpilot.repository.ProjectChannelRepository;
@@ -24,8 +23,7 @@ import java.util.Map;
 /**
  * 渠道消息同步服务（PRD 3.2 多渠道沟通接入）：
  *  - 定时增量同步飞书群消息（水位线 + 分页游标）；
- *  - 事件回调实时入库（飞书 im.message.receive_v1、企微 @机器人消息）；
- *  - 企微会话存档走官方 SDK（见 WeComClient.syncArchive 文档指引）。
+ *  - 事件回调实时入库（飞书 im.message.receive_v1）。
  */
 @Service
 public class ChannelSyncService {
@@ -34,19 +32,17 @@ public class ChannelSyncService {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final FeishuClient feishuClient;
-    private final WeComClient weComClient;
     private final ProjectChannelRepository channelRepository;
     private final ProjectRepository projectRepository;
     private final SyncStateRepository syncStateRepository;
     private final MessageService messageService;
     private final AnalysisService analysisService;
 
-    public ChannelSyncService(FeishuClient feishuClient, WeComClient weComClient,
+    public ChannelSyncService(FeishuClient feishuClient,
                               ProjectChannelRepository channelRepository, ProjectRepository projectRepository,
                               SyncStateRepository syncStateRepository, MessageService messageService,
                               AnalysisService analysisService) {
         this.feishuClient = feishuClient;
-        this.weComClient = weComClient;
         this.channelRepository = channelRepository;
         this.projectRepository = projectRepository;
         this.syncStateRepository = syncStateRepository;
@@ -67,18 +63,6 @@ public class ChannelSyncService {
                 total += syncFeishuChannel(pc);
             } catch (Exception e) {
                 log.warn("飞书渠道同步失败 channel={}: {}", pc.getChannelId(), e.getMessage());
-            }
-        }
-        for (ProjectChannel pc : channelRepository.findByChannelTypeAndSyncEnabledTrue(
-                ProjectChannel.ChannelType.WECOM)) {
-            if (!weComClient.configured()) {
-                log.info("企微未配置凭证，跳过同步");
-                break;
-            }
-            try {
-                total += syncWecomChannel(pc);
-            } catch (Exception e) {
-                log.warn("企微渠道同步失败 channel={}: {}", pc.getChannelId(), e.getMessage());
             }
         }
         return total;
@@ -143,13 +127,6 @@ public class ChannelSyncService {
         return saved;
     }
 
-    /** 企微渠道同步（会话存档，未接入 SDK 时抛出指引异常由上层降级日志） */
-    public int syncWecomChannel(ProjectChannel pc) {
-        return weComClient.syncArchive(pc.getChannelId(), raw -> {
-            // SDK 接入后：raw 为解密后的聊天消息，转换为 Message 入库
-        });
-    }
-
     // ---------- 事件回调入库 ----------
 
     /** 飞书事件：im.message.receive_v1（按租户代码路由） */
@@ -203,45 +180,6 @@ public class ChannelSyncService {
             };
         } catch (Exception e) {
             return msg.path("content").asText("");
-        }
-    }
-
-    /** 企微回调消息（@机器人文本消息） */
-    public void handleWecomCallback(String plainXml) {
-        try {
-            javax.xml.parsers.DocumentBuilderFactory factory = javax.xml.parsers.DocumentBuilderFactory.newInstance();
-            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-            org.w3c.dom.Document doc = factory.newDocumentBuilder().parse(new java.io.ByteArrayInputStream(
-                    plainXml.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
-            String chatId = textOf(doc, "ChatId");
-            String content = textOf(doc, "Content");
-            String msgId = textOf(doc, "MsgId");
-            String fromUser = textOf(doc, "FromUserName");
-            if (chatId.isBlank() || content.isBlank()) {
-                return;
-            }
-            channelRepository.findByChannelTypeAndSyncEnabledTrue(ProjectChannel.ChannelType.WECOM)
-                    .stream()
-                    .filter(pc -> pc.getChannelId().equals(chatId))
-                    .findFirst()
-                    .ifPresent(pc -> {
-                        Message m = new Message();
-                        m.setProjectId(pc.getProjectId());
-                        m.setChannelType(Message.ChannelType.WECOM);
-                        m.setChannelId(chatId);
-                        m.setMsgId(msgId.isBlank() ? "wecom_" + System.currentTimeMillis() : msgId);
-                        m.setSenderId(fromUser);
-                        m.setSenderName(fromUser);
-                        m.setContent(content);
-                        m.setMsgType(Message.MsgType.TEXT);
-                        m.setSentAt(LocalDateTime.now());
-                        m.setSource("EVENT");
-                        if (messageService.save(m)) {
-                            analysisService.analyzeAsync(pc.getProjectId(), "EVENT");
-                        }
-                    });
-        } catch (Exception e) {
-            log.warn("企微回调处理失败: {}", e.getMessage());
         }
     }
 

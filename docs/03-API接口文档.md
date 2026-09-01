@@ -46,8 +46,6 @@ Token 由 `POST /auth/login` 签发，默认 24 小时过期（可配置）。
 | 40102 | 用户名或密码错误 | 50012 | 报告生成失败 |
 | 40103 | 账号已停用 | 50020 | AI Provider 配置错误 |
 | 40300 | 权限不足 | 50030 | 飞书接口错误 |
-| 40301 | 资源不属于该项目 | 50031 | 企微接口错误 |
-| 40401 | 项目不存在 | 50032 | 企微会话存档未接入 |
 | 40402 | 模板不存在 | 40403 | 渠道绑定不存在 |
 | 40404 | 干系人不存在 | 40405 | 建议不存在 |
 | 40406 | 用户不存在 | 40400 | 接口不存在 |
@@ -80,7 +78,6 @@ POST /auth/login        [公开]
 {
   "token": "eyJhbGciOi...",
   "user": { "id": 1, "username": "admin", "displayName": "企业管理员",
-            "role": "ADMIN", "feishuOpenId": "", "wecomUserId": "", "phone": "" }
 }
 ```
 
@@ -108,7 +105,6 @@ POST /users
 ```
 PUT /users/{id}
 { "displayName": "张三丰", "role": "MANAGER", "feishuOpenId": "ou_xxx",
-  "wecomUserId": "zhangsan", "phone": "13812345678", "active": true }
 ```
 
 ### 2.6 重置密码　[角色：ADMIN]
@@ -286,8 +282,6 @@ DELETE /projects/{id}/channels/{channelId}
 PUT    /projects/{id}/channels/{channelId}/sync    { "enabled": false }
 ```
 
-`channelType` 可选：`FEISHU`（飞书群 chat_id）/ `WECOM`（企微群）/ `WECHAT_IMPORT`（微信导入文件）/ `MOCK`（演示）。
-
 ### 4.8 手动触发 AI 分析　[角色：MANAGER]
 
 ```
@@ -352,13 +346,10 @@ GET /projects/{id}/calibrations
 
 ```
 POST   /projects/{id}/stakeholders            { "nodeKey": "enable_remote", "role": "客户IT",
-                                               "name": "张三", "contactType": "WECOM",
                                                "contactId": "zhangsan", "wechatId": "" }
 PUT    /projects/{id}/stakeholders/{sid}
 DELETE /projects/{id}/stakeholders/{sid}
 ```
-
-`contactType`：`FEISHU`（open_id，前端生成深链唤起会话）/ `WECOM`（userid）/ `WECHAT`（微信号，展示复制）。
 
 ### 4.15 消息与时间线
 
@@ -382,7 +373,6 @@ GET /channels/status
 ```json
 { "feishu": { "configured": false, "appId": "", "supported": true,
               "note": "群消息自动同步 + 事件回调 + 一键深链沟通" },
-  "wecom":  { "configured": false, ... },
   "wechat": { "configured": true, "watchDir": "./data/watch",
               "watchEnabled": true, "ocr": "disabled", "note": "..." },
   "mock":   { "configured": true, "note": "演示渠道" } }
@@ -412,15 +402,9 @@ POST /channels/mock/generate?projectId=1
 // { "generated": 9 }
 ```
 
-### 5.5 渠道事件回调（公开接口，供飞书/企微开放平台配置）
-
 ```
 POST /webhooks/feishu/events     // 飞书：url_verification + im.message.receive_v1，支持 AES 解密
-GET  /webhooks/wecom/events      // 企微：回调 URL 验证（msg_signature/timestamp/nonce/echostr）
-POST /webhooks/wecom/events      // 企微：@机器人消息（XML，AES 解密）
 ```
-
-配置方法见 docs/07-飞书企微接入指南.md。
 
 ---
 
