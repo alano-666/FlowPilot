@@ -91,7 +91,7 @@ export FLOWPILOT_FEISHU_APPSECRET=xxxxxxxx
 1. 打开浏览器（Chrome/Edge/Safari 都行），地址栏输入：**http://localhost:8080**
 2. 账号 `admin`，密码 `admin123`，点登录
 
-**界面导览（7 个菜单，从左边栏进入）：**
+**界面导览（5 个菜单，从左边栏进入）：**
 
 | 菜单 | 里面有什么 |
 |---|---|
@@ -103,7 +103,7 @@ export FLOWPILOT_FEISHU_APPSECRET=xxxxxxxx
 
 ### 第 6 步：第一次体验（没接飞书也能玩，3 分钟）
 
-1. 看板点进任意一个项目（自带 4 个演示项目）
+1. 看板点进任意一个演示项目
 2. 点右上角「🎭 生成演示消息」→ 再点「🤖 立即 AI 分析」
 3. 观察：流程图节点推进、进度条变化、干系人卡片、风险预警自动出现
 
@@ -220,7 +220,7 @@ https://alano-666.github.io/FlowPilot/ —— 不用安装，浏览器打开就�
 
 ## 🔧 技术栈（给开发者看）
 
-- 后端：Java 21+ / Spring Boot 3.5 / Spring Data JPA / H2(开发)→PostgreSQL(生产) / JWT / POI / OpenPDF
+- 后端：Java 21+ / Spring Boot 3.5 / Spring Data JPA / H2(开发)→PostgreSQL(生产) / JWT / POI
 - AI：Anthropic 官方 SDK（结构化输出）/ 第三方 Anthropic 兼容网关 / OpenAI 兼容协议 / Mock，可插拔
 - 前端：Vue 3 / Vite / Element Plus（构建产物内嵌后端，单包部署）
 - 定时任务：Spring @Scheduled（同步/分析/巡检/摘要/报告/清理）
