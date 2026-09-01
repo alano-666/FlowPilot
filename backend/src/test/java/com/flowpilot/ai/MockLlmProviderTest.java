@@ -140,4 +140,48 @@ class MockLlmProviderTest {
         assertNull(com.flowpilot.service.AnalysisService.fuzzyFindSender(map, "林"));
         assertNull(com.flowpilot.service.AnalysisService.fuzzyFindSender(map, null));
     }
+
+    @Test
+    void buildRoleMapFromGroupAnnouncement() {
+        Message m = new Message();
+        m.setContent("角色分工：王敏·产品经理、陈强·研发负责人、周凯·运维，林总是甲方负责人");
+        m.setSentAt(LocalDateTime.now());
+        var map = com.flowpilot.service.AnalysisService.buildRoleMap(List.of(m));
+        assertEquals("产品经理", map.get("王敏"));
+        assertEquals("研发负责人", map.get("陈强"));
+        assertEquals("运维", map.get("周凯"));
+        assertEquals("甲方负责人", map.get("林总"));
+    }
+
+    @Test
+    void extractPrefixedStakeholdersFromScriptLines() {
+        Message m1 = new Message();
+        m1.setContent("【林总】验收演示约明天下午三点");
+        m1.setSenderId("ou_real_888");
+        m1.setSentAt(LocalDateTime.now());
+        Message m2 = new Message();
+        m2.setContent("【王敏】收到，我马上安排");
+        m2.setSenderId("ou_real_999");
+        m2.setSentAt(LocalDateTime.now());
+        Message announce = new Message();
+        announce.setContent("王敏·产品经理，林总是甲方负责人");
+        announce.setSentAt(LocalDateTime.now());
+        var list = com.flowpilot.service.AnalysisService.extractPrefixedStakeholders(
+                List.of(announce, m1, m2));
+        assertEquals(2, list.size());
+        assertEquals("林总", list.get(0).name());
+        assertEquals("甲方负责人", list.get(0).role());
+        assertEquals("ou_real_888", list.get(0).contact_id());
+        assertEquals("王敏", list.get(1).name());
+        assertEquals("产品经理", list.get(1).role());
+    }
+
+    @Test
+    void extractPrefixedIgnoresSystemMarkers() {
+        Message m = new Message();
+        m.setContent("【风险】节点超时了");
+        m.setSentAt(LocalDateTime.now());
+        var list = com.flowpilot.service.AnalysisService.extractPrefixedStakeholders(List.of(m));
+        assertTrue(list.isEmpty());
+    }
 }

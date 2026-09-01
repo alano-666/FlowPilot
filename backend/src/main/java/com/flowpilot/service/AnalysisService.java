@@ -212,13 +212,15 @@ public class AnalysisService {
             insightRepository.save(insight);
         }
 
-        // 7. 干系人更新：AI 解析 + 消息内【干系人】标记兜底解析（双路合并，按 节点+角色+姓名 去重）
+        // 7. 干系人更新：AI 解析 + 【干系人】标记 + 台词前缀【名字】三路合并
         //    并用消息里的真实发送者 open_id 回填联系方式，保证「一键联系」真实可用
         if (!project.isManualLock()) {
             List<AiSchemas.AnalysisResult.StakeholderUpdate> marked = extractMarkedStakeholders(context);
+            List<AiSchemas.AnalysisResult.StakeholderUpdate> prefixed = extractPrefixedStakeholders(context);
             List<AiSchemas.AnalysisResult.StakeholderUpdate> merged = new ArrayList<>();
             merged.addAll(result.stakeholders_update() == null ? List.of() : result.stakeholders_update());
             merged.addAll(marked);
+            merged.addAll(prefixed);
             upsertStakeholders(projectId, merged, buildSenderMap(context));
         }
 
@@ -309,7 +311,7 @@ public class AnalysisService {
     /** 消息内【干系人】姓名|角色|平台|ID 标记的兜底解析（不依赖 AI 是否解析该格式） */
     private List<AiSchemas.AnalysisResult.StakeholderUpdate> extractMarkedStakeholders(List<Message> context) {
         java.util.regex.Pattern p = java.util.regex.Pattern.compile(
-                "【干系人】([^|]+)\\|([^|]+)\\|([^|]+)\\|([^|\\s]+)");
+                "【干系人】([^|]+)\\|([^|]+)\\|([^|]+)\\|([^|\\s]*)");
         List<AiSchemas.AnalysisResult.StakeholderUpdate> out = new ArrayList<>();
         for (Message m : context) {
             if (m.getContent() == null) {
@@ -323,6 +325,65 @@ public class AnalysisService {
             }
         }
         return out;
+    }
+
+    /** 剧本台词前缀解析：消息以【名字】开头（如【林总】【王敏】）→ 识别为干系人 */
+    public static List<AiSchemas.AnalysisResult.StakeholderUpdate> extractPrefixedStakeholders(List<Message> context) {
+        java.util.regex.Pattern prefix = java.util.regex.Pattern.compile(
+                "^【([^】【\\[\\]】]{2,8})】");
+        java.util.regex.Pattern systemWord = java.util.regex.Pattern.compile(
+                "干系人|风险|下一步|完成|临时节点");
+        Map<String, String> roleMap = buildRoleMap(context);
+        List<AiSchemas.AnalysisResult.StakeholderUpdate> out = new ArrayList<>();
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        for (Message m : context) {
+            if (m.getContent() == null) {
+                continue;
+            }
+            java.util.regex.Matcher matcher = prefix.matcher(m.getContent().trim());
+            if (!matcher.find() || systemWord.matcher(matcher.group(1)).find()) {
+                continue;
+            }
+            String name = matcher.group(1).trim();
+            String role = roleMap.getOrDefault(name, "");
+            String contactId = m.getSenderId() != null && m.getSenderId().startsWith("ou_")
+                    && !m.getSenderId().startsWith("ou_cast_") ? m.getSenderId() : "";
+            if (!seen.add(name + "|" + role)) {
+                continue; // 同一人名+角色去重
+            }
+            out.add(new AiSchemas.AnalysisResult.StakeholderUpdate(
+                    null, role, name, "feishu", contactId));
+        }
+        return out;
+    }
+
+    /**
+     * 从群公告式消息解析 姓名→角色 映射：
+     * 支持「王敏·产品经理、陈强·研发负责人」「王敏-产品经理」「林总是甲方负责人」等写法。
+     */
+    public static Map<String, String> buildRoleMap(List<Message> context) {
+        Map<String, String> map = new LinkedHashMap<>();
+        // 模式1：名字·角色 / 名字-角色（顿号、逗号、空格分隔多个）
+        java.util.regex.Pattern dotRole = java.util.regex.Pattern.compile(
+                "([\\u4e00-\\u9fa5]{2,4})[·\\-]([\\u4e00-\\u9fa5]{2,12})");
+        // 模式2：名字+是/担任+角色（如「林总是甲方负责人」）
+        java.util.regex.Pattern isRole = java.util.regex.Pattern.compile(
+                "([\\u4e00-\\u9fa5]{2,4})(?:是|担任)([\\u4e00-\\u9fa5]{2,14}(?:负责人|经理|工程师|总监|运维|测试|主管|客户))");
+        for (Message m : context) {
+            if (m.getContent() == null) {
+                continue;
+            }
+            String text = m.getContent();
+            java.util.regex.Matcher d = dotRole.matcher(text);
+            while (d.find()) {
+                map.putIfAbsent(d.group(1).trim(), d.group(2).trim());
+            }
+            java.util.regex.Matcher i = isRole.matcher(text);
+            while (i.find()) {
+                map.putIfAbsent(i.group(1).trim(), i.group(2).trim());
+            }
+        }
+        return map;
     }
 
     private void upsertStakeholders(Long projectId, List<AiSchemas.AnalysisResult.StakeholderUpdate> updates,

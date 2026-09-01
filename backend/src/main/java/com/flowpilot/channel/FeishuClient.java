@@ -237,16 +237,22 @@ public class FeishuClient {
 
     // ---------- 用户与群 ----------
 
-    /** 按 open_id 查用户姓名 */
+    /** 按 open_id 查用户姓名。任何失败（权限不足/网络）都降级返回 openId，绝不阻塞消息入库 */
     public String getUserName(String tenantCode, String openId) {
-        JsonNode resp = client.get()
-                .uri(OPEN_API + "/contact/v3/users/" + urlEncode(openId) + "?user_id_type=open_id")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tenantAccessToken(tenantCode))
-                .retrieve().body(JsonNode.class);
-        if (resp == null || resp.path("code").asInt() != 0) {
+        try {
+            JsonNode resp = client.get()
+                    .uri(OPEN_API + "/contact/v3/users/" + urlEncode(openId) + "?user_id_type=open_id")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + tenantAccessToken(tenantCode))
+                    .retrieve().body(JsonNode.class);
+            if (resp == null || resp.path("code").asInt() != 0) {
+                return openId;
+            }
+            String name = resp.path("data").path("user").path("name").asText(openId);
+            return name == null || name.isBlank() ? openId : name;
+        } catch (Exception e) {
+            log.debug("查询用户姓名失败(降级为 openId): {} {}", openId, e.getMessage());
             return openId;
         }
-        return resp.path("data").path("user").path("name").asText(openId);
     }
 
     /** 机器人所在群列表（数据源管理页绑定用） */
