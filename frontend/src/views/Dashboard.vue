@@ -8,6 +8,18 @@
       </div>
     </div>
 
+    <!-- 渠道接入状态一览 -->
+    <div class="fp-card" style="padding:12px 16px">
+      <div class="gap8" style="flex-wrap:wrap">
+        <span class="small muted">渠道接入：</span>
+        <el-tag v-for="(v, k) in channelStatus" :key="k" size="small"
+                :type="v.configured ? 'success' : 'info'" effect="plain">
+          {{ channelIcon(k) }} {{ channelName(k) }}{{ v.configured ? ' 已接入' : ' 未接入' }}
+        </el-tag>
+        <el-button size="small" text type="primary" @click="$router.push('/channels')">管理渠道 →</el-button>
+      </div>
+    </div>
+
     <!-- 概览统计（英雄数字） -->
     <div class="stat-grid">
       <div class="stat-tile">
@@ -102,6 +114,14 @@ const page = ref(1)
 const pageSize = 12
 const syncing = ref(false)
 const filters = reactive({ keyword: '', status: '', riskStatus: '' })
+const channelStatus = ref({})
+
+function channelIcon(k) {
+  return { feishu: '🕊️', wecom: '💼', wechat: '💬', email: '📧', mock: '🎭' }[k] || '🔌'
+}
+function channelName(k) {
+  return { feishu: '飞书', wecom: '企业微信', wechat: '微信导入', email: '邮件', mock: '演示' }[k] || k
+}
 
 const createVisible = ref(false)
 const creating = ref(false)
@@ -117,6 +137,7 @@ async function load() {
   projects.value = d.items
   total.value = d.total
   overview.value = await api.get('/dashboard/overview')
+  channelStatus.value = await api.get('/channels/status')
 }
 
 async function refresh() {
