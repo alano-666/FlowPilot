@@ -385,6 +385,12 @@ async function handle(method, url, data, params) {
   }
 
   if (url === '/channels/status') return channelStatus
+  if (url === '/channels/feishu/tenants') {
+    return [{ code: 'default', name: '默认组织', configured: true }]
+  }
+  if (url === '/channels/feishu/chats') {
+    return [{ chat_id: 'oc_demo_1', name: '星辰订单中心升级项目' }, { chat_id: 'oc_demo_2', name: '公司内部交付群' }]
+  }
   if (url === '/projects/casting/script') {
     return [
       { number: 1, title: '需求收集', description: '客户提需求，产品接单', lines: [{}] },

@@ -101,7 +101,9 @@ public class NotifyService {
                     }
                 }
             }
-            feishuClient.sendTextToChat(feishuChannels.get(0).getChannelId(), atContent.toString());
+            String tenant = feishuChannels.get(0).getTenantCode() == null
+                    ? "default" : feishuChannels.get(0).getTenantCode();
+            feishuClient.sendTextToChat(tenant, feishuChannels.get(0).getChannelId(), atContent.toString());
             return;
         }
         if (fsWebhook != null && !fsWebhook.isBlank()) {

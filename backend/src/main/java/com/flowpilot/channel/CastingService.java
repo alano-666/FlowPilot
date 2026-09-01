@@ -164,9 +164,10 @@ public class CastingService {
         if (!feishuClient.configured()) {
             throw new BizException(50030, "飞书未配置凭证");
         }
+        String tenant = feishu.getTenantCode() == null ? "default" : feishu.getTenantCode();
         for (Line line : scene.lines()) {
             // 机器人统一发送，台词带角色前缀保持身份清晰
-            feishuClient.sendTextToChat(feishu.getChannelId(),
+            feishuClient.sendTextToChat(tenant, feishu.getChannelId(),
                     "【" + line.name() + "·" + line.role() + "】" + line.content());
         }
         return scene.lines().size();

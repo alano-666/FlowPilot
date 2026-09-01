@@ -166,10 +166,22 @@ public class ProjectService {
 
     // ---------- 渠道绑定 ----------
 
+    /** 渠道绑定（String 类型入口，供控制器使用；tenantCode 为飞书组织租户，缺省主组织） */
+    @Transactional
+    public ProjectChannel bindChannel(Long projectId, String channelType, String channelId,
+                                      String channelName, String tenantCode) {
+        ProjectChannel pc = bindChannel(projectId, channelTypeOf(channelType), channelId, channelName);
+        if (tenantCode != null && !tenantCode.isBlank()) {
+            pc.setTenantCode(tenantCode);
+            channelRepository.save(pc);
+        }
+        return pc;
+    }
+
     /** 渠道绑定（String 类型入口，供控制器使用） */
     @Transactional
     public ProjectChannel bindChannel(Long projectId, String channelType, String channelId, String channelName) {
-        return bindChannel(projectId, channelTypeOf(channelType), channelId, channelName);
+        return bindChannel(projectId, channelType, channelId, channelName, null);
     }
 
     @Transactional

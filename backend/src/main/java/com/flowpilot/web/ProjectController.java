@@ -119,13 +119,15 @@ public class ProjectController {
 
     // ---------- 渠道 ----------
 
-    public record BindChannelRequest(String channelType, String channelId, String channelName) {
+    public record BindChannelRequest(String channelType, String channelId, String channelName,
+                                     String tenantCode) {
     }
 
     @RequireRole(User.Role.MANAGER)
     @PostMapping("/{id}/channels")
     public ApiResponse<ProjectChannel> bindChannel(@PathVariable Long id, @RequestBody BindChannelRequest req) {
-        return ApiResponse.ok(projectService.bindChannel(id, req.channelType(), req.channelId(), req.channelName()));
+        return ApiResponse.ok(projectService.bindChannel(id, req.channelType(), req.channelId(),
+                req.channelName(), req.tenantCode()));
     }
 
     @RequireRole(User.Role.MANAGER)

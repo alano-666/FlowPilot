@@ -84,8 +84,9 @@ public class ChannelSyncService {
         return total;
     }
 
-    /** 飞书群增量同步（水位线 + 分页） */
+    /** 飞书群增量同步（水位线 + 分页，按渠道绑定的租户取凭证） */
     public int syncFeishuChannel(ProjectChannel pc) {
+        String tenant = pc.getTenantCode() == null ? "default" : pc.getTenantCode();
         SyncState state = syncStateRepository.findByChannelTypeAndChannelId("FEISHU", pc.getChannelId())
                 .orElseGet(() -> {
                     SyncState s = new SyncState();
@@ -98,8 +99,8 @@ public class ChannelSyncService {
         String cursor = null;
         int count = 0;
         do {
-            FeishuClient.MessagePage page = feishuClient.listMessages(pc.getChannelId(), startTime, cursor);
-            count += ingestFeishuMessages(pc, page.items());
+            FeishuClient.MessagePage page = feishuClient.listMessages(tenant, pc.getChannelId(), startTime, cursor);
+            count += ingestFeishuMessages(pc, tenant, page.items());
             cursor = page.pageToken();
             if (cursor != null && !cursor.isBlank()) {
                 state.setLastCursor(cursor);
@@ -114,12 +115,12 @@ public class ChannelSyncService {
         pc.setLastSyncCursor(state.getLastCursor());
         channelRepository.save(pc);
         if (count > 0) {
-            log.info("飞书渠道同步完成 chat={} 新增 {} 条", pc.getChannelId(), count);
+            log.info("飞书渠道同步完成 tenant={} chat={} 新增 {} 条", tenant, pc.getChannelId(), count);
         }
         return count;
     }
 
-    private int ingestFeishuMessages(ProjectChannel pc, List<FeishuClient.FeishuMessage> items) {
+    private int ingestFeishuMessages(ProjectChannel pc, String tenant, List<FeishuClient.FeishuMessage> items) {
         List<Message> messages = new ArrayList<>();
         for (FeishuClient.FeishuMessage fm : items) {
             Message m = new Message();
@@ -128,7 +129,7 @@ public class ChannelSyncService {
             m.setChannelId(pc.getChannelId());
             m.setMsgId(fm.messageId());
             m.setSenderId(fm.senderId());
-            m.setSenderName(fm.senderId() == null ? "未知" : feishuClient.getUserName(fm.senderId()));
+            m.setSenderName(fm.senderId() == null ? "未知" : feishuClient.getUserName(tenant, fm.senderId()));
             m.setContent(fm.textContent());
             m.setMsgType(toMsgType(fm.msgType()));
             m.setSentAt(LocalDateTime.ofInstant(Instant.ofEpochMilli(fm.createTimeMs()), ZoneId.systemDefault()));
@@ -151,8 +152,8 @@ public class ChannelSyncService {
 
     // ---------- 事件回调入库 ----------
 
-    /** 飞书事件：im.message.receive_v1 */
-    public void handleFeishuEvent(JsonNode event) {
+    /** 飞书事件：im.message.receive_v1（按租户代码路由） */
+    public void handleFeishuEvent(String tenantCode, JsonNode event) {
         String type = event.path("header").path("event_type").asText("");
         if (!"im.message.receive_v1".equals(type)) {
             return;
@@ -163,9 +164,11 @@ public class ChannelSyncService {
         if (chatId.isBlank() || messageId.isBlank()) {
             return;
         }
+        String tenant = tenantCode == null ? "default" : tenantCode;
         channelRepository.findByChannelTypeAndSyncEnabledTrue(ProjectChannel.ChannelType.FEISHU)
                 .stream()
-                .filter(pc -> pc.getChannelId().equals(chatId))
+                .filter(pc -> pc.getChannelId().equals(chatId)
+                        && tenant.equals(pc.getTenantCode() == null ? "default" : pc.getTenantCode()))
                 .findFirst()
                 .ifPresent(pc -> {
                     Message m = new Message();
@@ -175,7 +178,7 @@ public class ChannelSyncService {
                     m.setMsgId(messageId);
                     String senderId = msg.path("sender").path("id").asText(null);
                     m.setSenderId(senderId);
-                    m.setSenderName(senderId == null ? "未知" : feishuClient.getUserName(senderId));
+                    m.setSenderName(senderId == null ? "未知" : feishuClient.getUserName(tenant, senderId));
                     m.setContent(extractFeishuContent(msg));
                     m.setMsgType(toMsgType(msg.path("message_type").asText("text")));
                     m.setSentAt(LocalDateTime.ofInstant(

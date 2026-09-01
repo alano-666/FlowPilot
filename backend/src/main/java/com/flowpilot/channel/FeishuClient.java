@@ -22,16 +22,16 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 飞书开放平台客户端（直连 HTTP API，不依赖官方 SDK）：
- *  - tenant_access_token 缓存与刷新
- *  - 群聊消息分页同步（im/v1/messages）
- *  - 应用机器人发消息（im/v1/messages create）
- *  - 群自定义机器人 webhook 推送
- *  - 事件回调 AES 解密（url_verification + im.message.receive_v1）
- *  - 飞书在线文档正文拉取（docx raw_content）
- *  - 一键沟通深链生成
+ * 飞书开放平台客户端（多租户版）：
+ *
+ * 一台 FlowPilot 可同时接入多个飞书组织。每个组织在自己的开发者后台
+ * 创建一套自建应用，通过 flowpilot.feishu.tenants 配置（code 唯一）：
+ *   - 单租户兼容：不配 tenants 时，code=default 使用顶级 app-id/app-secret；
+ *   - 事件回调按租户代码路由：POST /api/v1/webhooks/feishu/events/{tenantCode}；
+ *   - 每个租户独立缓存 tenant_access_token。
  */
 @Component
 public class FeishuClient {
@@ -39,12 +39,16 @@ public class FeishuClient {
     private static final Logger log = LoggerFactory.getLogger(FeishuClient.class);
     private static final String OPEN_API = "https://open.feishu.cn/open-apis";
     private static final ObjectMapper MAPPER = new ObjectMapper();
+    public static final String DEFAULT_TENANT = "default";
 
     private final FlowPilotProperties props;
     private final RestClient client;
 
-    private volatile String tenantToken;
-    private volatile long tokenExpireAt;
+    /** 每租户 token 缓存 */
+    private record TokenInfo(String token, long expireAt) {
+    }
+
+    private final ConcurrentHashMap<String, TokenInfo> tokens = new ConcurrentHashMap<>();
 
     public FeishuClient(FlowPilotProperties props) {
         this.props = props;
@@ -56,33 +60,75 @@ public class FeishuClient {
                 .build();
     }
 
+    // ---------- 租户解析 ----------
+
+    /** 默认租户（主组织）是否已配置凭证 */
     public boolean configured() {
+        return tenantConfig(DEFAULT_TENANT).configured();
+    }
+
+    /** 解析租户配置：default 用顶级字段，其余查 tenants 列表 */
+    public TenantConfig tenantConfig(String tenantCode) {
+        String code = tenantCode == null || tenantCode.isBlank() ? DEFAULT_TENANT : tenantCode;
         FlowPilotProperties.Feishu f = props.getFeishu();
-        return f.getAppId() != null && !f.getAppId().isBlank()
-                && f.getAppSecret() != null && !f.getAppSecret().isBlank();
+        if (!DEFAULT_TENANT.equals(code)) {
+            for (FlowPilotProperties.Tenant t : f.getTenants()) {
+                if (t.getCode().equals(code)) {
+                    return new TenantConfig(code, t.getName(), t.getAppId(), t.getAppSecret(),
+                            t.getEncryptKey(), t.getVerificationToken());
+                }
+            }
+            throw new BizException(50030, "飞书租户未配置: " + code);
+        }
+        return new TenantConfig(DEFAULT_TENANT, "默认组织", f.getAppId(), f.getAppSecret(),
+                f.getEncryptKey(), f.getVerificationToken());
+    }
+
+    public List<TenantConfig> listTenants() {
+        List<TenantConfig> out = new ArrayList<>();
+        TenantConfig def = tenantConfig(DEFAULT_TENANT);
+        if (def.appId() != null && !def.appId().isBlank()) {
+            out.add(def);
+        }
+        for (FlowPilotProperties.Tenant t : props.getFeishu().getTenants()) {
+            out.add(new TenantConfig(t.getCode(), t.getName(), t.getAppId(), t.getAppSecret(),
+                    t.getEncryptKey(), t.getVerificationToken()));
+        }
+        return out;
+    }
+
+    public record TenantConfig(String code, String name, String appId, String appSecret,
+                               String encryptKey, String verificationToken) {
+        public boolean configured() {
+            return appId != null && !appId.isBlank() && appSecret != null && !appSecret.isBlank();
+        }
     }
 
     // ---------- Token ----------
 
-    private String tenantAccessToken() {
-        if (tenantToken != null && System.currentTimeMillis() < tokenExpireAt - 60_000) {
-            return tenantToken;
+    private String tenantAccessToken(String tenantCode) {
+        TenantConfig cfg = tenantConfig(tenantCode);
+        TokenInfo cached = tokens.get(cfg.code());
+        if (cached != null && System.currentTimeMillis() < cached.expireAt() - 60_000) {
+            return cached.token();
         }
         synchronized (this) {
-            if (tenantToken != null && System.currentTimeMillis() < tokenExpireAt - 60_000) {
-                return tenantToken;
+            cached = tokens.get(cfg.code());
+            if (cached != null && System.currentTimeMillis() < cached.expireAt() - 60_000) {
+                return cached.token();
             }
-            FlowPilotProperties.Feishu f = props.getFeishu();
             JsonNode resp = client.post()
                     .uri(OPEN_API + "/auth/v3/tenant_access_token/internal")
-                    .body(Map.of("app_id", f.getAppId(), "app_secret", f.getAppSecret()))
+                    .body(Map.of("app_id", cfg.appId(), "app_secret", cfg.appSecret()))
                     .retrieve().body(JsonNode.class);
             if (resp == null || resp.path("code").asInt() != 0) {
-                throw new BizException(50030, "飞书 token 获取失败: " + (resp == null ? "空响应" : resp));
+                throw new BizException(50030, "飞书租户[" + cfg.code() + "] token 获取失败: "
+                        + (resp == null ? "空响应" : resp.path("msg").asText()));
             }
-            tenantToken = resp.path("tenant_access_token").asText();
-            tokenExpireAt = System.currentTimeMillis() + resp.path("expire").asLong() * 1000;
-            return tenantToken;
+            String token = resp.path("tenant_access_token").asText();
+            long expireAt = System.currentTimeMillis() + resp.path("expire").asLong() * 1000;
+            tokens.put(cfg.code(), new TokenInfo(token, expireAt));
+            return token;
         }
     }
 
@@ -96,7 +142,7 @@ public class FeishuClient {
     }
 
     /** 分页拉取群聊消息，startTime 为 epoch 秒 */
-    public MessagePage listMessages(String chatId, Long startTimeSeconds, String pageToken) {
+    public MessagePage listMessages(String tenantCode, String chatId, Long startTimeSeconds, String pageToken) {
         StringBuilder uri = new StringBuilder(OPEN_API + "/im/v1/messages?container_id_type=chat&container_id=")
                 .append(urlEncode(chatId)).append("&page_size=50");
         if (startTimeSeconds != null) {
@@ -106,7 +152,7 @@ public class FeishuClient {
             uri.append("&page_token=").append(urlEncode(pageToken));
         }
         JsonNode resp = client.get().uri(uri.toString())
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tenantAccessToken())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tenantAccessToken(tenantCode))
                 .retrieve().body(JsonNode.class);
         if (resp == null || resp.path("code").asInt() != 0) {
             throw new BizException(50030, "飞书消息拉取失败: " + (resp == null ? "空响应" : resp.path("msg").asText()));
@@ -159,14 +205,15 @@ public class FeishuClient {
     // ---------- 发送消息 ----------
 
     /** 应用机器人向群聊发消息（需将机器人加入群并开通发消息权限） */
-    public void sendTextToChat(String chatId, String text) {
-        if (!configured()) {
-            log.info("[飞书模拟发送] chat={} text={}", chatId, text);
+    public void sendTextToChat(String tenantCode, String chatId, String text) {
+        TenantConfig cfg = tenantConfig(tenantCode);
+        if (!cfg.configured()) {
+            log.info("[飞书模拟发送] tenant={} chat={} text={}", tenantCode, chatId, text);
             return;
         }
         JsonNode resp = client.post()
                 .uri(OPEN_API + "/im/v1/messages?receive_id_type=chat_id")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tenantAccessToken())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tenantAccessToken(tenantCode))
                 .body(Map.of(
                         "receive_id", chatId,
                         "msg_type", "text",
@@ -191,10 +238,10 @@ public class FeishuClient {
     // ---------- 用户与群 ----------
 
     /** 按 open_id 查用户姓名 */
-    public String getUserName(String openId) {
+    public String getUserName(String tenantCode, String openId) {
         JsonNode resp = client.get()
                 .uri(OPEN_API + "/contact/v3/users/" + urlEncode(openId) + "?user_id_type=open_id")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tenantAccessToken())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tenantAccessToken(tenantCode))
                 .retrieve().body(JsonNode.class);
         if (resp == null || resp.path("code").asInt() != 0) {
             return openId;
@@ -203,10 +250,10 @@ public class FeishuClient {
     }
 
     /** 机器人所在群列表（数据源管理页绑定用） */
-    public List<Map<String, String>> listBotChats() {
+    public List<Map<String, String>> listBotChats(String tenantCode) {
         JsonNode resp = client.get()
                 .uri(OPEN_API + "/im/v1/chats?page_size=100")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tenantAccessToken())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tenantAccessToken(tenantCode))
                 .retrieve().body(JsonNode.class);
         List<Map<String, String>> chats = new ArrayList<>();
         if (resp == null || resp.path("code").asInt() != 0) {
@@ -228,11 +275,13 @@ public class FeishuClient {
     // ---------- 事件解密 ----------
 
     /**
-     * 事件回调解密。url_verification 返回 challenge，业务事件返回解密后 JSON 字符串。
+     * 事件回调解密（按租户的 encryptKey）。url_verification 返回 challenge，
+     * 业务事件返回解密后 JSON 字符串。
      */
-    public String decryptEvent(String encryptBase64) {
+    public String decryptEvent(String tenantCode, String encryptBase64) {
         try {
-            byte[] keyBytes = sha256(props.getFeishu().getEncryptKey().getBytes(StandardCharsets.UTF_8));
+            TenantConfig cfg = tenantConfig(tenantCode);
+            byte[] keyBytes = sha256(cfg.encryptKey().getBytes(StandardCharsets.UTF_8));
             byte[] encrypted = Base64.getDecoder().decode(encryptBase64);
             IvParameterSpec iv = new IvParameterSpec(encrypted, 0, 16);
             Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
@@ -247,10 +296,10 @@ public class FeishuClient {
     // ---------- 在线文档 ----------
 
     /** 拉取飞书在线文档纯文本（需应用获得文档读取权限） */
-    public String fetchDocRawContent(String docToken) {
+    public String fetchDocRawContent(String tenantCode, String docToken) {
         JsonNode resp = client.get()
                 .uri(OPEN_API + "/docx/v1/documents/" + urlEncode(docToken) + "/raw_content")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tenantAccessToken())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tenantAccessToken(tenantCode))
                 .retrieve().body(JsonNode.class);
         if (resp == null || resp.path("code").asInt() != 0) {
             throw new BizException(50030, "飞书文档读取失败(请确认应用已开通文档权限并加入文档协作者): "

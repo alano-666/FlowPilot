@@ -198,7 +198,7 @@ public class TemplateService {
         if (token == null) {
             throw new BizException(40005, "无法从链接中识别飞书文档 ID，请复制文档链接的 token 部分");
         }
-        String text = feishuClient.fetchDocRawContent(token);
+        String text = feishuClient.fetchDocRawContent("default", token);
         return parseAndCreate("飞书文档-" + token + ".md", text, createdBy);
     }
 

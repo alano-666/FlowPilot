@@ -67,6 +67,16 @@ flowpilot:
     app-secret: ${FLOWPILOT_FEISHU_APPSECRET:}
     encrypt-key: ${FLOWPILOT_FEISHU_ENCRYPTKEY:}
     verification-token: ${FLOWPILOT_FEISHU_VERIFICATIONTOKEN:}
+    # 多租户：一台 FlowPilot 同时接入多个飞书组织。
+    # 每个组织在自己的开发者后台创建一套自建应用后，把凭证配置到这里：
+    # 回调地址用 https://你的公网地址/api/v1/webhooks/feishu/events/{code}
+    tenants:
+      # - code: org-a
+      #   name: 星辰电商
+      #   app-id: cli_对方组织的appid
+      #   app-secret: 对方组织的secret
+      #   encrypt-key: ""
+      #   verification-token: ""
   wecom:
     corp-id: ${FLOWPILOT_WECOM_CORPID:}
     corp-secret: ${FLOWPILOT_WECOM_CORPSECRET:}

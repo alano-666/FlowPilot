@@ -40,6 +40,10 @@ public class ProjectChannel {
     @Column(nullable = false, length = 128)
     private String channelId;
 
+    /** 飞书组织租户代码（多租户支持；default=主组织，其余见 flowpilot.feishu.tenants） */
+    @Column(nullable = false, length = 32)
+    private String tenantCode = "default";
+
     @Column(length = 128)
     private String channelName;
 
@@ -63,6 +67,8 @@ public class ProjectChannel {
     public void setChannelType(ChannelType channelType) { this.channelType = channelType; }
     public String getChannelId() { return channelId; }
     public void setChannelId(String channelId) { this.channelId = channelId; }
+    public String getTenantCode() { return tenantCode; }
+    public void setTenantCode(String tenantCode) { this.tenantCode = tenantCode; }
     public String getChannelName() { return channelName; }
     public void setChannelName(String channelName) { this.channelName = channelName; }
     public boolean isSyncEnabled() { return syncEnabled; }

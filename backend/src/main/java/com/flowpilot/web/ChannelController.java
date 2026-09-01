@@ -72,37 +72,47 @@ public class ChannelController {
                         "note", "演示渠道：无凭证生成仿真群聊")));
     }
 
-    /** 机器人所在飞书群列表（绑定渠道用） */
+    /** 机器人所在飞书群列表（绑定渠道用；tenantCode 缺省为主组织） */
     @GetMapping("/feishu/chats")
-    public ApiResponse<List<Map<String, String>>> feishuChats() {
-        if (!feishuClient.configured()) {
-            throw new BizException(50030, "飞书未配置凭证（flowpilot.feishu.app-id/app-secret）");
+    public ApiResponse<List<Map<String, String>>> feishuChats(@RequestParam(required = false) String tenantCode) {
+        String tenant = tenantCode == null ? "default" : tenantCode;
+        if (!feishuClient.tenantConfig(tenant).configured()) {
+            throw new BizException(50030, "飞书租户[" + tenant + "]未配置凭证");
         }
-        return ApiResponse.ok(feishuClient.listBotChats());
+        return ApiResponse.ok(feishuClient.listBotChats(tenant));
+    }
+
+    /** 全部飞书租户列表（多租户管理） */
+    @GetMapping("/feishu/tenants")
+    public ApiResponse<List<Map<String, Object>>> feishuTenants() {
+        return ApiResponse.ok(feishuClient.listTenants().stream()
+                .map(t -> Map.<String, Object>of(
+                        "code", t.code(), "name", t.name(), "configured", t.configured()))
+                .toList());
     }
 
     /**
-     * 飞书凭证自检（接入向导用）：验证 app-id/app-secret 能否换取 token，
-     * 并返回机器人所在群列表，帮助确认权限与发布状态。
+     * 飞书凭证自检（接入向导用）：验证指定租户的 app-id/app-secret 能否换取 token，
+     * 并返回机器人所在群列表。
      */
     @GetMapping("/feishu/test")
-    public ApiResponse<Map<String, Object>> feishuTest() {
-        if (!feishuClient.configured()) {
+    public ApiResponse<Map<String, Object>> feishuTest(@RequestParam(required = false) String tenantCode) {
+        String tenant = tenantCode == null ? "default" : tenantCode;
+        if (!feishuClient.tenantConfig(tenant).configured()) {
             return ApiResponse.ok(Map.of(
                     "ok", false,
-                    "message", "尚未配置飞书凭证：请在 backend/.env.local 设置 FLOWPILOT_FEISHU_APPID / "
-                            + "FLOWPILOT_FEISHU_APPSECRET 后重启（步骤见 docs/07 第 1 章）"));
+                    "message", "飞书租户[" + tenant + "]尚未配置凭证：见 docs/07 创建应用后填入配置"));
         }
         try {
-            List<Map<String, String>> chats = feishuClient.listBotChats();
+            List<Map<String, String>> chats = feishuClient.listBotChats(tenant);
             return ApiResponse.ok(Map.of(
                     "ok", true,
-                    "message", "飞书凭证有效 ✓（如群列表为空，请将机器人加入目标群并发布应用版本）",
+                    "message", "飞书租户[" + tenant + "]凭证有效 ✓（如群列表为空，请将机器人加入目标群并发布应用版本）",
                     "chats", chats));
         } catch (Exception e) {
             return ApiResponse.ok(Map.of(
                     "ok", false,
-                    "message", "飞书凭证校验失败：" + e.getMessage()
+                    "message", "飞书租户[" + tenant + "]凭证校验失败：" + e.getMessage()
                             + "（请检查 App ID/Secret 是否正确、应用是否已发布）"));
         }
     }

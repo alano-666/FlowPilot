@@ -127,7 +127,38 @@ public class FlowPilotProperties {
         private String encryptKey = "";
         /** 事件订阅验证 Token */
         private String verificationToken = "";
+        /**
+         * 多租户支持：一台 FlowPilot 同时接入多个飞书组织。
+         * 每个组织在自己后台创建一套自建应用，把凭证填到这里（或用 API/界面添加）。
+         */
+        private final List<Tenant> tenants = new ArrayList<>();
 
+        public String getAppId() { return appId; }
+        public void setAppId(String appId) { this.appId = appId; }
+        public String getAppSecret() { return appSecret; }
+        public void setAppSecret(String appSecret) { this.appSecret = appSecret; }
+        public String getEncryptKey() { return encryptKey; }
+        public void setEncryptKey(String encryptKey) { this.encryptKey = encryptKey; }
+        public String getVerificationToken() { return verificationToken; }
+        public void setVerificationToken(String verificationToken) { this.verificationToken = verificationToken; }
+        public List<Tenant> getTenants() { return tenants; }
+    }
+
+    /** 飞书组织租户（多租户） */
+    public static class Tenant {
+        /** 租户代码（回调地址路径段，唯一，如 org-a） */
+        private String code = "";
+        /** 显示名（如 星辰电商） */
+        private String name = "";
+        private String appId = "";
+        private String appSecret = "";
+        private String encryptKey = "";
+        private String verificationToken = "";
+
+        public String getCode() { return code; }
+        public void setCode(String code) { this.code = code; }
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
         public String getAppId() { return appId; }
         public void setAppId(String appId) { this.appId = appId; }
         public String getAppSecret() { return appSecret; }
