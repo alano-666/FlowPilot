@@ -68,6 +68,8 @@ public final class PromptBuilder {
                 2. completion_criteria 用可验证的客观描述（如：客户后台显示策略已生效）。
                 3. responsible_roles 使用流程中的角色名（如：客户IT、我方技术支持）。
                 4. 分支条件完整抽取（如：如果客户已购买远程授权）。
+                4.1 文档中的「例外规则」「退回机制」（如「XX不通过时，退回XX重新处理」）
+                    必须逐条抽取为 branches，from 为退回目标节点，to 为当前节点。
                 5. 专业词汇与同义词完整收录，方便后续聊天记录同义匹配。
                 6. 时效要求必须转换为 sla_hours 数值：如「24 小时内完成」→ sla_hours=24，
                    「48 小时内完成」→ sla_hours=48；文档未提及时效时可为 null。
