@@ -9,8 +9,6 @@
       </div>
       <div class="gap8">
         <el-button type="primary" :loading="analyzing" @click="analyze">🤖 立即 AI 分析</el-button>
-        <el-button :loading="mockLoading" @click="generateMock">🎭 生成演示消息</el-button>
-        <el-button type="warning" plain @click="openCast">🎬 虚拟群演</el-button>
       </div>
     </div>
 
@@ -156,29 +154,6 @@
       </div>
     </div>
 
-    <!-- 虚拟群演对话框 -->
-    <el-dialog v-model="castVisible" title="🎬 虚拟群演（无真实飞书用户时的演示方案）" width="620px">
-      <p class="small muted" style="margin-top:0">
-        按剧本上演：不同虚拟身份（客户/产品/研发/测试/运维）发布刻意模糊的群聊消息，
-        每幕自动触发 AI 分析——看 AI 如何从"差不多、应该没问题"里判断进度与风险。
-      </p>
-      <el-table :data="script" size="small" highlight-current-row @current-change="row => selectedScene = row?.number">
-        <el-table-column label="幕" width="60">
-          <template #default="{ row }">第{{ row.number }}幕</template>
-        </el-table-column>
-        <el-table-column prop="title" label="场景" width="120" />
-        <el-table-column prop="description" label="剧情" min-width="200" />
-        <el-table-column label="台词数" width="70">
-          <template #default="{ row }">{{ row.lines.length }} 条</template>
-        </el-table-column>
-      </el-table>
-      <template #footer>
-        <el-button @click="castVisible = false">关闭</el-button>
-        <el-button :loading="casting" @click="doCast(false)">上演本幕</el-button>
-        <el-button type="warning" :loading="casting" @click="doCast(true)">全部连播（每幕 12 秒）</el-button>
-      </template>
-    </el-dialog>
-
     <!-- 添加干系人 -->
     <el-dialog v-model="stakeDialog" title="添加干系人" width="480px">
       <el-form label-width="90px">
@@ -227,34 +202,6 @@ const suggestions = ref([])
 const messages = ref([])
 const timeline = ref([])
 const analyzing = ref(false)
-const mockLoading = ref(false)
-const castVisible = ref(false)
-const casting = ref(false)
-const script = ref([])
-const selectedScene = ref(1)
-
-async function openCast() {
-  script.value = await api.get('/projects/casting/script')
-  selectedScene.value = script.value[0]?.number || 1
-  castVisible.value = true
-}
-
-async function doCast(autoPlay) {
-  casting.value = true
-  try {
-    const scenes = autoPlay ? script.value : script.value.filter(s => s.number === selectedScene.value)
-    for (let i = 0; i < scenes.length; i++) {
-      const s = scenes[i]
-      const r = await api.post(`/projects/${projectId}/cast`, { scene: s.number, delivery: 'virtual' })
-      ElMessage.success(`第${s.number}幕「${s.title}」上演：${r.casted} 条消息，AI 分析已触发`)
-      if (autoPlay && i < scenes.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 12000))
-      }
-      load()
-    }
-  } catch (e) { /* 拦截器已提示 */ } finally { casting.value = false }
-}
-
 const corrForm = reactive({ field: 'current_node', newValue: '', note: '' })
 const progressValue = ref(0)
 const stakeDialog = ref(false)
@@ -303,15 +250,6 @@ async function analyze() {
     ElMessage.success('AI 分析完成')
     load()
   } catch (e) { /* 拦截器已提示 */ } finally { analyzing.value = false }
-}
-
-async function generateMock() {
-  mockLoading.value = true
-  try {
-    const r = await api.post(`/channels/mock/generate?projectId=${projectId}`, {})
-    ElMessage.success(`已生成 ${r.generated} 条演示消息，可点击 AI 分析`)
-    load()
-  } finally { mockLoading.value = false }
 }
 
 async function doCorrect() {

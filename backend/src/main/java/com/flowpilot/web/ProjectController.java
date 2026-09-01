@@ -40,13 +40,11 @@ public class ProjectController {
     private final MessageService messageService;
     private final AnalysisRunRepository runRepository;
     private final AiInsightRepository insightRepository;
-    private final com.flowpilot.channel.CastingService castingService;
 
     public ProjectController(ProjectService projectService, AnalysisService analysisService,
                              CalibrationService calibrationService, DashboardService dashboardService,
                              MessageService messageService, AnalysisRunRepository runRepository,
-                             AiInsightRepository insightRepository,
-                             com.flowpilot.channel.CastingService castingService) {
+                             AiInsightRepository insightRepository) {
         this.projectService = projectService;
         this.analysisService = analysisService;
         this.calibrationService = calibrationService;
@@ -54,7 +52,6 @@ public class ProjectController {
         this.messageService = messageService;
         this.runRepository = runRepository;
         this.insightRepository = insightRepository;
-        this.castingService = castingService;
     }
 
     /** 项目分页列表（看板） */
@@ -257,26 +254,6 @@ public class ProjectController {
     public ApiResponse<Void> deleteStakeholder(@PathVariable Long id, @PathVariable Long stakeholderId) {
         calibrationService.deleteStakeholder(id, stakeholderId);
         return ApiResponse.ok();
-    }
-
-    // ---------- 虚拟群演（无真实飞书用户时的演示方案） ----------
-
-    /** 群演剧本列表 */
-    @GetMapping("/casting/script")
-    public ApiResponse<List<?>> castingScript() {
-        return ApiResponse.ok(castingService.script());
-    }
-
-    public record CastRequest(Integer scene, String delivery) {
-    }
-
-    /** 上演一幕：virtual=本地虚拟注入（默认）；feishu=机器人真实发送到绑定群 */
-    @RequireRole(User.Role.MANAGER)
-    @PostMapping("/{id}/cast")
-    public ApiResponse<Map<String, Object>> cast(@PathVariable Long id, @RequestBody CastRequest req) {
-        int count = castingService.cast(id, req.scene() == null ? 1 : req.scene(),
-                req.delivery() == null ? "virtual" : req.delivery());
-        return ApiResponse.ok(Map.of("casted", count));
     }
 
     // ---------- 消息与时间线 ----------

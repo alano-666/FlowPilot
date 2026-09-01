@@ -23,18 +23,16 @@ public class ChannelController {
 
     private final FeishuClient feishuClient;
     private final WeComClient weComClient;
-    private final MockChannelService mockChannelService;
     private final ChannelSyncService channelSyncService;
     private final com.flowpilot.channel.EmailChannelService emailChannelService;
     private final FlowPilotProperties props;
 
     public ChannelController(FeishuClient feishuClient, WeComClient weComClient,
-                             MockChannelService mockChannelService, ChannelSyncService channelSyncService,
+                             ChannelSyncService channelSyncService,
                              com.flowpilot.channel.EmailChannelService emailChannelService,
                              FlowPilotProperties props) {
         this.feishuClient = feishuClient;
         this.weComClient = weComClient;
-        this.mockChannelService = mockChannelService;
         this.channelSyncService = channelSyncService;
         this.emailChannelService = emailChannelService;
         this.props = props;
@@ -124,18 +122,6 @@ public class ChannelController {
         int n = channelSyncService.syncAll();
         int emails = emailChannelService.enabled() ? emailChannelService.sync() : 0;
         return ApiResponse.ok(Map.of("syncedMessages", n, "syncedEmails", emails));
-    }
-
-    public record MockGenerateRequest(String advanceTo) {
-    }
-
-    /** 为项目生成演示群聊（mock 渠道） */
-    @RequireRole(User.Role.MANAGER)
-    @PostMapping("/mock/generate")
-    public ApiResponse<Map<String, Object>> mockGenerate(@RequestParam Long projectId,
-                                                         @RequestBody(required = false) MockGenerateRequest req) {
-        var messages = mockChannelService.generate(projectId, req == null ? null : req.advanceTo());
-        return ApiResponse.ok(Map.of("generated", messages.size()));
     }
 
     private String mask(String s) {
